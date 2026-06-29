@@ -124,28 +124,28 @@ function buildSingleNoteReportDiagram(
     id: "title",
     x: 0,
     y: 0,
-    width: 1660,
-    height: 170,
+    width: 2140,
+    height: 230,
     color: theme.ink,
     title: chalkTitle(analysis.title, options.sourceLabel),
     body: mainQuestion(analysis),
-    titleSize: 42,
-    bodySize: 29,
+    titleSize: 56,
+    bodySize: 38,
   });
 
   addChalkPanel(elements, {
     theme,
     fontFamily,
     id: "judgement",
-    x: 300,
-    y: 260,
-    width: 1060,
-    height: 210,
+    x: 390,
+    y: 340,
+    width: 1360,
+    height: 280,
     color: theme.green,
     title: "잠정 결론",
-    body: chalkLines(judgementSignal(analysis), 56, 3),
-    titleSize: 31,
-    bodySize: 24,
+    body: chalkLines(judgementSignal(analysis), 60, 3),
+    titleSize: 40,
+    bodySize: 31,
   });
 
   addChalkPanel(elements, {
@@ -153,44 +153,44 @@ function buildSingleNoteReportDiagram(
     fontFamily,
     id: "sales",
     x: 0,
-    y: 560,
-    width: 500,
-    height: 260,
+    y: 760,
+    width: 650,
+    height: 340,
     color: theme.blue,
     title: "1. 판매/수요",
-    body: chalkLines(salesSignal(analysis), 39, 4),
-    titleSize: 29,
-    bodySize: 21,
+    body: chalkLines(salesSignal(analysis), 42, 4),
+    titleSize: 37,
+    bodySize: 28,
   });
 
   addChalkPanel(elements, {
     theme,
     fontFamily,
     id: "price",
-    x: 580,
-    y: 560,
-    width: 500,
-    height: 260,
+    x: 745,
+    y: 760,
+    width: 650,
+    height: 340,
     color: theme.yellow,
     title: "2. 가격/운임",
-    body: chalkLines(priceSignal(analysis), 39, 4),
-    titleSize: 29,
-    bodySize: 21,
+    body: chalkLines(priceSignal(analysis), 42, 4),
+    titleSize: 37,
+    bodySize: 28,
   });
 
   addChalkPanel(elements, {
     theme,
     fontFamily,
     id: "ops",
-    x: 1160,
-    y: 560,
-    width: 500,
-    height: 260,
+    x: 1490,
+    y: 760,
+    width: 650,
+    height: 340,
     color: theme.muted,
     title: "3. 운영 회복",
-    body: chalkLines(opsSignal(analysis), 39, 4),
-    titleSize: 29,
-    bodySize: 21,
+    body: chalkLines(opsSignal(analysis), 42, 4),
+    titleSize: 37,
+    bodySize: 28,
   });
 
   addChalkPanel(elements, {
@@ -198,67 +198,67 @@ function buildSingleNoteReportDiagram(
     fontFamily,
     id: "mix",
     x: 0,
-    y: 900,
-    width: 520,
-    height: 220,
+    y: 1210,
+    width: 670,
+    height: 300,
     color: theme.ink,
     title: "4. 용도/고객 믹스",
-    body: chalkLines(mixSignal(analysis), 40, 3),
-    titleSize: 27,
-    bodySize: 20,
+    body: chalkLines(mixSignal(analysis), 43, 3),
+    titleSize: 35,
+    bodySize: 26,
   });
 
   addChalkPanel(elements, {
     theme,
     fontFamily,
     id: "counter",
-    x: 570,
-    y: 900,
-    width: 520,
-    height: 220,
+    x: 735,
+    y: 1210,
+    width: 670,
+    height: 300,
     color: theme.red,
     title: "5. 단정하면 안 되는 이유",
-    body: chalkLines(counterSignal(analysis), 40, 3),
-    titleSize: 27,
-    bodySize: 20,
+    body: chalkLines(counterSignal(analysis), 43, 3),
+    titleSize: 35,
+    bodySize: 26,
   });
 
   addChalkPanel(elements, {
     theme,
     fontFamily,
     id: "next",
-    x: 1140,
-    y: 900,
-    width: 520,
-    height: 220,
+    x: 1470,
+    y: 1210,
+    width: 670,
+    height: 300,
     color: theme.ink,
     title: "다음에 확인할 것",
-    body: chalkLines(nextChecks(analysis), 40, 3),
-    titleSize: 27,
-    bodySize: 20,
+    body: chalkLines(nextChecks(analysis), 43, 3),
+    titleSize: 35,
+    bodySize: 26,
   });
 
   addChalkPanel(elements, {
     theme,
     fontFamily,
     id: "caveat",
-    x: 310,
-    y: 1200,
-    width: 1040,
-    height: 140,
+    x: 390,
+    y: 1610,
+    width: 1360,
+    height: 200,
     color: theme.red,
     title: "품질 게이트",
-    body: chalkLines(qualitySignal(analysis), 72, 2),
-    titleSize: 27,
-    bodySize: 20,
+    body: chalkLines(qualitySignal(analysis), 74, 2),
+    titleSize: 35,
+    bodySize: 26,
   });
 
-  addChalkArrow(elements, "title-judge", { x: 830, y: 170 }, { x: 830, y: 260 }, theme.green);
-  addChalkArrow(elements, "judge-sales", { x: 825, y: 470 }, { x: 250, y: 560 }, theme.blue);
-  addChalkArrow(elements, "judge-price", { x: 830, y: 470 }, { x: 830, y: 560 }, theme.yellow);
-  addChalkArrow(elements, "judge-ops", { x: 835, y: 470 }, { x: 1410, y: 560 }, theme.muted);
-  addChalkArrow(elements, "price-counter", { x: 830, y: 820 }, { x: 830, y: 900 }, theme.red);
-  addChalkArrow(elements, "ops-next", { x: 1410, y: 820 }, { x: 1400, y: 900 }, theme.line);
+  addChalkArrow(elements, "title-judge", { x: 1070, y: 230 }, { x: 1070, y: 340 }, theme.green);
+  addChalkArrow(elements, "judge-sales", { x: 1065, y: 620 }, { x: 325, y: 760 }, theme.blue);
+  addChalkArrow(elements, "judge-price", { x: 1070, y: 620 }, { x: 1070, y: 760 }, theme.yellow);
+  addChalkArrow(elements, "judge-ops", { x: 1075, y: 620 }, { x: 1815, y: 760 }, theme.muted);
+  addChalkArrow(elements, "price-counter", { x: 1070, y: 1100 }, { x: 1070, y: 1210 }, theme.red);
+  addChalkArrow(elements, "ops-next", { x: 1815, y: 1100 }, { x: 1805, y: 1210 }, theme.line);
 
   const scene = createScene(elements);
   scene.appState = {

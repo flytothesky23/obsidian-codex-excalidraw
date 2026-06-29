@@ -33,7 +33,7 @@ describe("Codex drawing brief", () => {
 
     expect(brief).toContain("Maximum 10 content boxes");
     expect(brief).toContain("Maximum 7 arrows");
-    expect(brief).toContain("Target 850-1200 visible Korean characters");
+    expect(brief).toContain("Target 650-950 visible Korean characters");
     expect(brief).toContain("If your diagram is harder to read than the Markdown note, simplify");
   });
 });

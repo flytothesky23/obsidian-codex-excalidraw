@@ -168,6 +168,8 @@ describe("diagram generation", () => {
 
     const rects = result.scene.elements.filter((element) => element.type === "rectangle");
     const texts = result.scene.elements.filter((element) => element.type === "text");
+    expect(Math.min(...texts.map((element) => element.fontSize))).toBeGreaterThanOrEqual(26);
+    expect(Math.max(...texts.map((element) => element.fontSize))).toBeGreaterThanOrEqual(48);
     for (const text of texts) {
       const owner = rects.find(
         (rect) =>
