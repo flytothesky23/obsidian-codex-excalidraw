@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { codexExecArgs } from "../src/codex-cli";
+import { codexExecArgs, resolveCodexCommand } from "../src/codex-cli";
 
 describe("Codex CLI command", () => {
   it("uses workspace write mode and stdin prompt", () => {
@@ -28,5 +28,19 @@ describe("Codex CLI command", () => {
       "--skip-git-repo-check",
       "-",
     ]);
+  });
+
+  it("resolves bare codex to the first executable absolute path", () => {
+    const command = resolveCodexCommand(
+      "codex",
+      ["/missing/codexian-codex", "/opt/homebrew/bin/codex", "codex"],
+      (path) => path === "/opt/homebrew/bin/codex",
+    );
+
+    expect(command).toBe("/opt/homebrew/bin/codex");
+  });
+
+  it("preserves an explicit Codex command path", () => {
+    expect(resolveCodexCommand("/custom/bin/codex", ["/opt/homebrew/bin/codex"], () => true)).toBe("/custom/bin/codex");
   });
 });

@@ -13,7 +13,7 @@ import {
 import { buildCanvas } from "./canvas";
 import { buildCanvasBrief } from "./canvas-brief";
 import { buildCodexBrief } from "./codex-brief";
-import { runCodexExec } from "./codex-cli";
+import { resolveCodexCommand, runCodexExec } from "./codex-cli";
 import { buildDiagram, defaultDiagramOptions } from "./diagram";
 import { createScene, renderExcalidrawMarkdown } from "./excalidraw";
 import { buildNoteContext, truncate } from "./markdown";
@@ -164,6 +164,11 @@ export default class CodexExcalidrawPlugin extends Plugin {
 
   async loadSettings(): Promise<void> {
     this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+    const resolvedCodexCommand = resolveCodexCommand(this.settings.codexCommand);
+    if (this.settings.codexCommand.trim() === "codex" && resolvedCodexCommand !== "codex") {
+      this.settings.codexCommand = resolvedCodexCommand;
+      await this.saveSettings();
+    }
   }
 
   async saveSettings(): Promise<void> {

@@ -180,7 +180,7 @@ export class CodexExcalidrawSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("Codex CLI command")
-      .setDesc("Used by the “with Codex CLI” commands. Keep this as `codex` unless your binary lives elsewhere.")
+      .setDesc("Used by the “with Codex CLI” commands. macOS Obsidian usually needs an absolute path such as /Users/flytothesky/.local/bin/codexian-codex or /opt/homebrew/bin/codex.")
       .addText((text) =>
         text.setValue(this.plugin.settings.codexCommand).onChange(async (value) => {
           this.plugin.settings.codexCommand = value.trim() || DEFAULT_SETTINGS.codexCommand;

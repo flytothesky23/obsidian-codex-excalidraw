@@ -1,4 +1,5 @@
 import { spawn } from "child_process";
+import { existsSync } from "fs";
 
 export interface CodexCliResult {
   stdout: string;
@@ -21,6 +22,29 @@ export function codexExecArgs(params: {
   return args;
 }
 
+export const CODEX_COMMAND_CANDIDATES = [
+  "/Users/flytothesky/.local/bin/codexian-codex",
+  "/opt/homebrew/bin/codex",
+  "/usr/local/bin/codex",
+  "codex",
+];
+
+export function resolveCodexCommand(
+  command: string | undefined,
+  candidates = CODEX_COMMAND_CANDIDATES,
+  exists: (path: string) => boolean = existsSync,
+): string {
+  const requested = command?.trim() || "codex";
+  if (requested !== "codex") return requested;
+
+  for (const candidate of candidates) {
+    if (candidate === "codex") continue;
+    if (exists(candidate)) return candidate;
+  }
+
+  return requested;
+}
+
 export async function runCodexExec(params: {
   command: string;
   cwd: string;
@@ -30,7 +54,8 @@ export async function runCodexExec(params: {
   timeoutMs: number;
 }): Promise<CodexCliResult> {
   return new Promise((resolve, reject) => {
-    const child = spawn(params.command, codexExecArgs({
+    const command = resolveCodexCommand(params.command);
+    const child = spawn(command, codexExecArgs({
       model: params.model,
       reasoningEffort: params.reasoningEffort,
     }), {
@@ -58,7 +83,11 @@ export async function runCodexExec(params: {
       if (settled) return;
       settled = true;
       window.clearTimeout(timer);
-      reject(error);
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+        reject(new Error(`Codex CLI executable not found: ${command}. Set the plugin Codex CLI command to /Users/flytothesky/.local/bin/codexian-codex or /opt/homebrew/bin/codex.`));
+      } else {
+        reject(error);
+      }
     });
     child.on("close", (code) => {
       if (settled) return;

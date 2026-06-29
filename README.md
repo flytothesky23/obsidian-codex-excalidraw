@@ -55,6 +55,8 @@ The settings tab includes:
 
 The actual Korean handwriting TTF is still configured in the Obsidian Excalidraw plugin's Local Font settings.
 
+On macOS, Obsidian may not inherit the terminal `PATH`. If Codex actions show `spawn codex ENOENT`, set `Codex CLI command` to an absolute path such as `/Users/flytothesky/.local/bin/codexian-codex` or `/opt/homebrew/bin/codex`. The plugin auto-resolves bare `codex` to those paths when available.
+
 ## BRAT install
 
 Use this repository URL in BRAT after publishing it to GitHub. This plugin is intended to update through GitHub releases.
