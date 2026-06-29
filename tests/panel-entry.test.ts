@@ -21,6 +21,8 @@ describe("Codex drawing panel entry points", () => {
   it("exposes chat and Codexian handoff actions in the side panel", () => {
     expect(pluginSource).toContain("runCodexChat");
     expect(pluginSource).toContain("openActiveFileInCodexian");
+    expect(pluginSource).toContain("Codex 대화창");
+    expect(pluginSource).toContain("Codex 입력");
     expect(pluginSource).toContain("대화 보내기");
     expect(pluginSource).toContain("Codexian 열기");
     expect(pluginSource).toContain("getCodexRuntimeSummary");
@@ -29,5 +31,16 @@ describe("Codex drawing panel entry points", () => {
   it("uses Codexian settings as the default runtime source", () => {
     expect(settingsSource).toContain('codexSettingsSource: "codexian"');
     expect(settingsSource).toContain("Codexian settings (recommended)");
+  });
+
+  it("uses a longer default timeout for Codex canvas generation", () => {
+    expect(settingsSource).toContain("codexTimeoutSeconds: 600");
+    expect(pluginSource).toContain("this.settings.codexTimeoutSeconds <= 180");
+  });
+
+  it("shows elapsed progress while Codex is running", () => {
+    expect(pluginSource).toContain("startProgress");
+    expect(pluginSource).toContain("updateProgressStatus");
+    expect(pluginSource).toContain("경과");
   });
 });

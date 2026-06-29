@@ -40,7 +40,7 @@ export const DEFAULT_SETTINGS: CodexExcalidrawSettings = {
   codexReasoningEffort: "xhigh",
   codexPermissionMode: "review",
   codexEnvironmentVariables: "",
-  codexTimeoutSeconds: 180,
+  codexTimeoutSeconds: 600,
 };
 
 export class CodexExcalidrawSettingTab extends PluginSettingTab {
@@ -286,7 +286,7 @@ export class CodexExcalidrawSettingTab extends PluginSettingTab {
       .setDesc("Maximum seconds to let Codex read source notes and compose the drawing.")
       .addSlider((slider) =>
         slider
-          .setLimits(30, 600, 30)
+          .setLimits(60, 1200, 60)
           .setDynamicTooltip()
           .setValue(this.plugin.settings.codexTimeoutSeconds)
           .onChange(async (value) => {

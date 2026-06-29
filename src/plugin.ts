@@ -168,7 +168,12 @@ export default class CodexExcalidrawPlugin extends Plugin {
   }
 
   async loadSettings(): Promise<void> {
-    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+    const loaded = await this.loadData();
+    this.settings = Object.assign({}, DEFAULT_SETTINGS, loaded);
+    if (!loaded?.codexTimeoutSeconds || this.settings.codexTimeoutSeconds <= 180) {
+      this.settings.codexTimeoutSeconds = DEFAULT_SETTINGS.codexTimeoutSeconds;
+      await this.saveSettings();
+    }
   }
 
   async saveSettings(): Promise<void> {
@@ -858,6 +863,9 @@ class CodexExcalidrawPanelView extends ItemView {
   private statusText = "";
   private isRunning = false;
   private messages: PanelMessage[] = [];
+  private progressTimer: number | null = null;
+  private runningStartedAt = 0;
+  private runningLabel = "";
 
   constructor(leaf: WorkspaceLeaf, private plugin: CodexExcalidrawPlugin) {
     super(leaf);
@@ -884,6 +892,10 @@ class CodexExcalidrawPanelView extends ItemView {
     );
   }
 
+  async onClose(): Promise<void> {
+    this.stopProgress();
+  }
+
   private render(): void {
     const { contentEl } = this;
     contentEl.empty();
@@ -900,18 +912,11 @@ class CodexExcalidrawPanelView extends ItemView {
       text: this.plugin.getCodexRuntimeSummary(),
     });
 
-    this.renderControls(root);
     this.renderChat(root);
-
-    const prompt = root.createEl("textarea");
-    prompt.addClass("codex-excalidraw-panel-prompt");
-    prompt.value = this.promptValue;
-    prompt.placeholder = "Codex에게 지시: 예) 글씨와 여백을 키우고, 질문-결론-근거-반례-다음 확인사항 구조로 다시 정리해줘";
-    prompt.addEventListener("input", () => {
-      this.promptValue = prompt.value;
-    });
+    this.renderComposer(root);
 
     const presetWrap = root.createDiv({ cls: "codex-excalidraw-panel-presets" });
+    presetWrap.createDiv({ cls: "codex-excalidraw-panel-section-title", text: "프롬프트 도구" });
     for (const preset of CODEX_PROMPT_PRESETS) {
       this.addButton(presetWrap, preset.label, () => {
         this.promptValue = [this.promptValue.trim(), preset.instruction]
@@ -922,34 +927,31 @@ class CodexExcalidrawPanelView extends ItemView {
       });
     }
 
+    this.renderControls(root);
+
     const actions = root.createDiv({ cls: "codex-excalidraw-panel-actions" });
-    this.addButton(actions, this.isRunning ? "Codex 응답 중..." : "대화 보내기", () => {
-      void this.runChat();
-    }, this.isRunning);
-    this.addButton(actions, "Codexian 열기", () => {
-      void this.plugin.openActiveFileInCodexian();
-    });
+    actions.createDiv({ cls: "codex-excalidraw-panel-section-title", text: "드로잉 / Canvas 작업" });
     this.addButton(actions, "노트→한눈필기", () => {
       void this.plugin.createFromCurrentNote(false);
-    });
+    }, this.isRunning);
     this.addButton(actions, "Codex 한눈필기", () => {
       void this.runPanelAction("study-note");
-    });
+    }, this.isRunning);
     this.addButton(actions, "Obsidian Canvas", () => {
       void this.runPanelAction("obsidian-canvas");
-    });
+    }, this.isRunning);
     this.addButton(actions, "Codex 맥락도", () => {
       void this.runPanelAction("context-map");
-    });
+    }, this.isRunning);
     this.addButton(actions, "현재 드로잉 수정", () => {
       void this.runPanelAction("revise-active");
-    });
+    }, this.isRunning);
     this.addButton(actions, "SVG식 도식", () => {
       void this.runPanelAction("svg-sketch");
-    });
+    }, this.isRunning);
     this.addButton(actions, "브리프 복사", () => {
       void this.plugin.copyCurrentCodexBrief();
-    });
+    }, this.isRunning);
 
     if (this.statusText) {
       root.createDiv({ cls: "codex-excalidraw-panel-status", text: this.statusText });
@@ -962,11 +964,19 @@ class CodexExcalidrawPanelView extends ItemView {
   }
 
   private renderChat(root: HTMLElement): void {
-    const chat = root.createDiv({ cls: "codex-excalidraw-panel-chat" });
+    const shell = root.createDiv({ cls: "codex-excalidraw-panel-chat-shell" });
+    const header = shell.createDiv({ cls: "codex-excalidraw-panel-chat-header" });
+    header.createSpan({ cls: "codex-excalidraw-panel-chat-title", text: "Codex 대화창" });
+    header.createSpan({
+      cls: "codex-excalidraw-panel-chat-subtitle",
+      text: this.isRunning ? "실행 중" : "현재 노트 맥락",
+    });
+
+    const chat = shell.createDiv({ cls: "codex-excalidraw-panel-chat-log" });
     if (this.messages.length === 0) {
       chat.createDiv({
         cls: "codex-excalidraw-panel-chat-empty",
-        text: "Codex와 대화하면서 현재 노트, Excalidraw, Canvas 수정 방향을 바로 지시할 수 있습니다.",
+        text: "아직 대화가 없습니다. 아래 입력창에 질문이나 수정 지시를 쓰고 `대화 보내기`를 누르세요.",
       });
       return;
     }
@@ -984,6 +994,28 @@ class CodexExcalidrawPanelView extends ItemView {
         text: message.text || (message.role === "assistant" ? "응답 수신 중..." : ""),
       });
     }
+  }
+
+  private renderComposer(root: HTMLElement): void {
+    const composer = root.createDiv({ cls: "codex-excalidraw-panel-composer" });
+    composer.createDiv({ cls: "codex-excalidraw-panel-section-title", text: "Codex 입력" });
+
+    const prompt = composer.createEl("textarea");
+    prompt.addClass("codex-excalidraw-panel-prompt");
+    prompt.value = this.promptValue;
+    prompt.placeholder = "예) 이 Canvas를 영상처럼 원문 파일 노드 + 개념 노드 + 근거 노드 구조로 다시 정리해줘";
+    prompt.disabled = this.isRunning;
+    prompt.addEventListener("input", () => {
+      this.promptValue = prompt.value;
+    });
+
+    const composerActions = composer.createDiv({ cls: "codex-excalidraw-panel-composer-actions" });
+    this.addButton(composerActions, this.isRunning ? "Codex 실행 중..." : "대화 보내기", () => {
+      void this.runChat();
+    }, this.isRunning);
+    this.addButton(composerActions, "Codexian 열기", () => {
+      void this.plugin.openActiveFileInCodexian();
+    }, this.isRunning);
   }
 
   private addButton(parent: HTMLElement, label: string, onClick: () => void, disabled = false): void {
@@ -1040,15 +1072,19 @@ class CodexExcalidrawPanelView extends ItemView {
   }
 
   private async runPanelAction(action: CodexPanelAction): Promise<void> {
-    this.statusText = `${actionLabel(action)} 실행 중...`;
-    this.render();
+    if (this.isRunning) return;
+    this.startProgress(`${actionLabel(action)} 실행 중`);
     try {
       const summary = await this.plugin.runCodexPanelAction(action, this.promptValue);
+      this.stopProgress();
       this.statusText = summary || `${actionLabel(action)} 완료`;
     } catch (error) {
+      this.stopProgress();
       const message = error instanceof Error ? error.message : String(error);
       this.statusText = `실패: ${message.slice(0, 220)}`;
       new Notice(this.statusText, 12000);
+    } finally {
+      this.isRunning = false;
     }
     this.render();
   }
@@ -1066,9 +1102,7 @@ class CodexExcalidrawPanelView extends ItemView {
     const assistantMessage: PanelMessage = { role: "assistant", text: "" };
     this.messages.push(assistantMessage);
     this.promptValue = "";
-    this.isRunning = true;
-    this.statusText = "Codex가 현재 맥락을 읽는 중...";
-    this.render();
+    this.startProgress("Codex 대화 응답 생성 중");
 
     try {
       const finalText = await this.plugin.runCodexChat(message, (chunk, stream) => {
@@ -1079,9 +1113,11 @@ class CodexExcalidrawPanelView extends ItemView {
         }
         this.render();
       });
+      this.stopProgress();
       assistantMessage.text = finalText;
       this.statusText = "Codex 응답 완료";
     } catch (error) {
+      this.stopProgress();
       const text = error instanceof Error ? error.message : String(error);
       assistantMessage.text = `실패: ${text}`;
       this.statusText = `실패: ${text.slice(0, 220)}`;
@@ -1090,6 +1126,35 @@ class CodexExcalidrawPanelView extends ItemView {
       this.isRunning = false;
       this.render();
     }
+  }
+
+  private startProgress(label: string): void {
+    this.stopProgress();
+    this.isRunning = true;
+    this.runningLabel = label;
+    this.runningStartedAt = Date.now();
+    this.updateProgressStatus();
+    this.progressTimer = window.setInterval(() => {
+      this.updateProgressStatus();
+      this.render();
+    }, 5000);
+    this.render();
+  }
+
+  private stopProgress(): void {
+    if (this.progressTimer !== null) {
+      window.clearInterval(this.progressTimer);
+      this.progressTimer = null;
+    }
+  }
+
+  private updateProgressStatus(): void {
+    const elapsed = Math.max(0, Math.round((Date.now() - this.runningStartedAt) / 1000));
+    this.statusText = [
+      `${this.runningLabel}... 경과 ${elapsed}s / 최대 ${this.plugin.settings.codexTimeoutSeconds}s`,
+      this.plugin.getCodexRuntimeSummary(),
+      "긴 Canvas/드로잉 생성은 Codex가 파일을 읽고 쓰는 동안 이 패널에서 대기합니다.",
+    ].join("\n");
   }
 }
 

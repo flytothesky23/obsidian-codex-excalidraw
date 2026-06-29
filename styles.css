@@ -76,13 +76,43 @@
   width: 100%;
 }
 
-.codex-excalidraw-panel-chat {
+.codex-excalidraw-panel-chat-shell {
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+}
+
+.codex-excalidraw-panel-chat-header {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.codex-excalidraw-panel-chat-title {
+  color: var(--text-normal);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.codex-excalidraw-panel-chat-subtitle {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.codex-excalidraw-panel-chat-log {
+  background: var(--background-primary);
   border: 1px solid var(--background-modifier-border);
   border-radius: 6px;
   display: flex;
   flex-direction: column;
   gap: 8px;
   max-height: 320px;
+  min-height: 140px;
   overflow: auto;
   padding: 8px;
 }
@@ -120,6 +150,26 @@
   word-break: break-word;
 }
 
+.codex-excalidraw-panel-composer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.codex-excalidraw-panel-composer-actions {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 1fr 1fr;
+}
+
+.codex-excalidraw-panel-section-title {
+  color: var(--text-muted);
+  flex-basis: 100%;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
 .codex-excalidraw-panel-scale-value {
   color: var(--text-muted);
   font-size: 12px;
@@ -130,12 +180,16 @@
   background: var(--background-primary);
   border: 1px solid var(--background-modifier-border);
   border-radius: 6px;
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.5;
-  min-height: 140px;
+  min-height: 120px;
   padding: 8px;
   resize: vertical;
   width: 100%;
+}
+
+.codex-excalidraw-panel-prompt:disabled {
+  opacity: 0.65;
 }
 
 .codex-excalidraw-panel-presets {
