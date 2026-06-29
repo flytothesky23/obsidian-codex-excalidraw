@@ -86,6 +86,27 @@ describe("diagram generation", () => {
     ).toBe(true);
   });
 
+  it("scales one-screen study-note typography and canvas geometry together", () => {
+    const notes = [
+      buildNoteContext({ path: "Note.md", content: "# 제목\n본문" }),
+    ];
+
+    const normal = buildDiagram(notes, defaultDiagramOptions("Scale", "Unit test"));
+    const larger = buildDiagram(notes, defaultDiagramOptions("Scale", "Unit test", "chalkboard", 4, 1.25));
+
+    const normalTexts = normal.scene.elements.filter((element) => element.type === "text");
+    const largerTexts = larger.scene.elements.filter((element) => element.type === "text");
+    const normalRects = normal.scene.elements.filter((element) => element.type === "rectangle");
+    const largerRects = larger.scene.elements.filter((element) => element.type === "rectangle");
+
+    expect(Math.min(...largerTexts.map((element) => element.fontSize))).toBeGreaterThan(
+      Math.min(...normalTexts.map((element) => element.fontSize)),
+    );
+    expect(Math.max(...largerRects.map((element) => element.width))).toBeGreaterThan(
+      Math.max(...normalRects.map((element) => element.width)),
+    );
+  });
+
   it("extracts a richer one-screen study note from a weekly report", () => {
     const content = [
       "# 2026-W25 유네코 경영분석 주간보고서",

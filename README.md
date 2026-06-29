@@ -12,9 +12,31 @@ Generate editable Excalidraw diagrams from Obsidian Markdown notes.
 - `Create Excalidraw map from selected notes with Codex CLI`
 - `Copy Codex drawing brief for current note`
 - `Open Codex Excalidraw panel`
+- `Revise active Excalidraw drawing with Codex panel`
 
 The generated files are `.excalidraw.md` Markdown drawings compatible with the Obsidian Excalidraw plugin.
 The non-Codex commands create a deterministic local draft. The Codex CLI commands create the same draft first, then run `codex exec` from the vault root to refine only the generated drawing file.
+
+## Codex side panel
+
+Open `Codex Excalidraw` in the right sidebar to drive drawing work with short instructions:
+
+- create a Korean handwritten study note from the current Markdown note
+- create a semantic context diagram from the current note and linked notes
+- revise the active `.excalidraw.md` drawing in place
+- ask for an SVG-like clean diagram while keeping editable Excalidraw elements
+
+The panel includes reusable prompt presets for readability, teacher-at-the-board notes, logic-spine extraction, whiteboard conversion, compact summaries, and content enrichment.
+
+## Readability settings
+
+The settings tab includes:
+
+- visual theme: chalkboard or whiteboard
+- handwriting font slot: use Excalidraw `Local Font` for Korean handwriting
+- study note text scale: scales generated text, panels, and arrows together
+
+The actual Korean handwriting TTF is still configured in the Obsidian Excalidraw plugin's Local Font settings.
 
 ## BRAT install
 
@@ -32,7 +54,7 @@ Release assets uploaded by the workflow:
 
 1. Make code changes.
 2. Run `npm test` and `npm run build`.
-3. Bump the plugin version with `npm version patch`, `npm version minor`, or an explicit version such as `npm version 0.2.1`.
+3. Bump the plugin version with `npm version patch`, `npm version minor`, or an explicit version such as `npm version 0.3.0`.
 4. Push the commit and tag to GitHub: `git push && git push --tags`.
 5. GitHub Actions creates the release. BRAT can then update installed vaults from that release.
 

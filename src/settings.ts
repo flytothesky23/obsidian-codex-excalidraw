@@ -5,6 +5,7 @@ export interface CodexExcalidrawSettings {
   outputFolder: string;
   visualTheme: "chalkboard" | "whiteboard";
   handwritingFontFamily: number;
+  studyNoteFontScale: number;
   includeLinkedNotes: boolean;
   linkedNoteDepth: number;
   maxNotesPerDiagram: number;
@@ -20,6 +21,7 @@ export const DEFAULT_SETTINGS: CodexExcalidrawSettings = {
   outputFolder: "Excalidraw/Codex Maps",
   visualTheme: "chalkboard",
   handwritingFontFamily: 4,
+  studyNoteFontScale: 1,
   includeLinkedNotes: true,
   linkedNoteDepth: 1,
   maxNotesPerDiagram: 40,
@@ -66,6 +68,38 @@ export class CodexExcalidrawSettingTab extends PluginSettingTab {
           .setValue(this.plugin.settings.visualTheme)
           .onChange(async (value) => {
             this.plugin.settings.visualTheme = value as CodexExcalidrawSettings["visualTheme"];
+            await this.plugin.saveSettings();
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName("Handwriting font slot")
+      .setDesc("Use Local Font for Korean handwriting. Change the actual TTF in the Excalidraw plugin font settings.")
+      .addDropdown((dropdown) =>
+        dropdown
+          .addOptions({
+            "4": "Local Font (recommended for Korean)",
+            "1": "Virgil / default handwritten",
+            "2": "Normal",
+            "3": "Code",
+          })
+          .setValue(String(this.plugin.settings.handwritingFontFamily))
+          .onChange(async (value) => {
+            this.plugin.settings.handwritingFontFamily = Number.parseInt(value, 10) || DEFAULT_SETTINGS.handwritingFontFamily;
+            await this.plugin.saveSettings();
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName("Study note text scale")
+      .setDesc("Scales generated Excalidraw text, panels, and arrows together so handwritten Korean stays readable.")
+      .addSlider((slider) =>
+        slider
+          .setLimits(0.75, 1.5, 0.05)
+          .setDynamicTooltip()
+          .setValue(this.plugin.settings.studyNoteFontScale)
+          .onChange(async (value) => {
+            this.plugin.settings.studyNoteFontScale = roundScale(value);
             await this.plugin.saveSettings();
           }),
       );
@@ -184,4 +218,8 @@ export class CodexExcalidrawSettingTab extends PluginSettingTab {
           }),
       );
   }
+}
+
+function roundScale(value: number): number {
+  return Math.round(value * 100) / 100;
 }

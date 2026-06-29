@@ -36,4 +36,25 @@ describe("Codex drawing brief", () => {
     expect(brief).toContain("Target 650-950 visible Korean characters");
     expect(brief).toContain("If your diagram is harder to read than the Markdown note, simplify");
   });
+
+  it("injects current visual settings into Codex CLI drawing briefs", () => {
+    const brief = buildCodexBrief(
+      [
+        buildNoteContext({
+          path: "Reports/W25.md",
+          content: "# W25\n본문",
+        }),
+      ],
+      "Excalidraw/Codex Maps/W25.excalidraw.md",
+      {
+        visualTheme: "whiteboard",
+        handwritingFontFamily: 4,
+        studyNoteFontScale: 1.25,
+      },
+    );
+
+    expect(brief).toContain("clean whiteboard");
+    expect(brief).toContain("Minimum readable text size 33");
+    expect(brief).toContain("fontFamily 4");
+  });
 });

@@ -49,14 +49,53 @@
   word-break: break-word;
 }
 
+.codex-excalidraw-panel-controls {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  display: grid;
+  gap: 8px;
+  padding: 8px;
+}
+
+.codex-excalidraw-panel-control-row {
+  align-items: center;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 44px minmax(0, 1fr) 48px;
+}
+
+.codex-excalidraw-panel-control-row select,
+.codex-excalidraw-panel-control-row input[type="range"] {
+  width: 100%;
+}
+
+.codex-excalidraw-panel-scale-value {
+  color: var(--text-muted);
+  font-size: 12px;
+  text-align: right;
+}
+
 .codex-excalidraw-panel-prompt {
   background: var(--background-primary);
   border: 1px solid var(--background-modifier-border);
   border-radius: 6px;
-  min-height: 120px;
+  font-size: 13px;
+  line-height: 1.5;
+  min-height: 140px;
   padding: 8px;
   resize: vertical;
   width: 100%;
+}
+
+.codex-excalidraw-panel-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.codex-excalidraw-panel-presets button {
+  font-size: 12px;
+  padding: 4px 8px;
 }
 
 .codex-excalidraw-panel-actions {
@@ -67,6 +106,17 @@
 .codex-excalidraw-panel-actions button {
   justify-content: center;
   width: 100%;
+}
+
+.codex-excalidraw-panel-status {
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  color: var(--text-normal);
+  font-size: 12px;
+  line-height: 1.5;
+  padding: 8px;
+  white-space: pre-wrap;
 }
 
 .codex-excalidraw-panel-note {

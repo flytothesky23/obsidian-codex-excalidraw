@@ -1,7 +1,22 @@
 import { truncate } from "./markdown";
 import type { NoteContext } from "./types";
 
-export function buildCodexBrief(notes: NoteContext[], targetPath: string): string {
+export interface CodexBriefOptions {
+  visualTheme?: "chalkboard" | "whiteboard";
+  handwritingFontFamily?: number;
+  studyNoteFontScale?: number;
+}
+
+export function buildCodexBrief(
+  notes: NoteContext[],
+  targetPath: string,
+  options: CodexBriefOptions = {},
+): string {
+  const fontScale = clampScale(options.studyNoteFontScale ?? 1);
+  const minBodyFont = Math.round(26 * fontScale);
+  const minTitleFont = Math.round(48 * fontScale);
+  const themeName = options.visualTheme === "whiteboard" ? "clean whiteboard" : "dark green chalkboard";
+  const fontFamily = options.handwritingFontFamily ?? 4;
   const noteBlocks = notes
     .map((note) => {
       const headings = note.headings.map((heading) => `${"#".repeat(heading.level)} ${heading.heading}`).join("\n");
@@ -53,7 +68,7 @@ export function buildCodexBrief(notes: NoteContext[], targetPath: string): strin
     "- One screen: target canvas should fit roughly within 2200 x 1850.",
     "- Maximum 10 content boxes, including title and caveat boxes.",
     "- Maximum 7 arrows. Avoid arrow labels except one or two short words.",
-    "- Minimum readable text size 26 for body text and 48 for the main title.",
+    `- Minimum readable text size ${minBodyFont} for body text and ${minTitleFont} for the main title.`,
     "- Target 650-950 visible Korean characters total across all canvas text.",
     "- No dense bullet blocks, no full tables, no duplicated metadata, no raw block IDs visible on canvas.",
     "- Use whitespace as structure. A sparse chalkboard note is good, but not if it drops the decision-critical evidence.",
@@ -68,9 +83,10 @@ export function buildCodexBrief(notes: NoteContext[], targetPath: string): strin
     "- Replace placeholder or draft drawing content from scratch when it limits the analysis.",
     "- Use editable Excalidraw text, rectangles, arrows, and groups rather than SVG or screenshots.",
     "- Prefer Excalidraw's hand-drawn taste: Korean handwriting via Excalidraw Local Font, chalk/marker-like strokes, slight roughness, and a clear teacher-at-the-board composition.",
-    "- Use either a dark green chalkboard theme or a clean whiteboard theme. Do not mix both in one drawing.",
+    `- Use a ${themeName} theme. Do not mix chalkboard and whiteboard in one drawing.`,
     "- Avoid playful bright fills, rainbow colors, decorative mind-map bubbles, and UI-card/dashboard aesthetics.",
-    "- Use Excalidraw fontFamily 4 for Korean handwritten text when the vault has a Local Font configured. Prefer a round, readable Korean handwriting font such as Gaegu. Do not rely on Virgil for Hangul because Virgil falls back to a non-handwritten Korean system font.",
+    `- Use Excalidraw fontFamily ${fontFamily} for Korean handwritten text. Prefer fontFamily 4 when the vault has a Local Font configured.`,
+    "- Prefer a round, readable Korean handwriting font such as Gaegu. Do not rely on Virgil for Hangul because Virgil falls back to a non-handwritten Korean system font.",
     "- Hide raw attachment/image paths unless the image itself is meaningfully embedded.",
     "- Keep labels concise enough to read on canvas, but not so compressed that meaning is lost.",
     "- Avoid overlapping elements. If dense, use multiple rows or sections.",
@@ -81,4 +97,9 @@ export function buildCodexBrief(notes: NoteContext[], targetPath: string): strin
     "",
     noteBlocks,
   ].join("\n");
+}
+
+function clampScale(value: number): number {
+  if (!Number.isFinite(value)) return 1;
+  return Math.min(1.5, Math.max(0.75, Math.round(value * 100) / 100));
 }

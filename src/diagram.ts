@@ -96,12 +96,14 @@ export function defaultDiagramOptions(
   sourceLabel: string,
   visualTheme: DiagramOptions["visualTheme"] = "chalkboard",
   handwritingFontFamily = 4,
+  studyNoteFontScale = 1,
 ): DiagramOptions {
   return {
     title,
     sourceLabel,
     visualTheme,
     handwritingFontFamily,
+    studyNoteFontScale,
     maxHeadingsPerNote: 8,
     maxTagsPerNote: 4,
     maxLinksPerNote: 5,
@@ -259,6 +261,8 @@ function buildSingleNoteReportDiagram(
   addChalkArrow(elements, "judge-ops", { x: 1075, y: 620 }, { x: 1815, y: 760 }, theme.muted);
   addChalkArrow(elements, "price-counter", { x: 1070, y: 1100 }, { x: 1070, y: 1210 }, theme.red);
   addChalkArrow(elements, "ops-next", { x: 1815, y: 1100 }, { x: 1805, y: 1210 }, theme.line);
+
+  scaleStudyNoteElements(elements, options.studyNoteFontScale);
 
   const scene = createScene(elements);
   scene.appState = {
@@ -439,6 +443,36 @@ function addChalkArrow(
       roughness: 2,
     }),
   );
+}
+
+function scaleStudyNoteElements(elements: ExcalidrawElement[], requestedScale: number): void {
+  const scale = clampScale(requestedScale);
+  if (scale === 1) return;
+
+  for (const element of elements) {
+    element.x = Math.round(element.x * scale);
+    element.y = Math.round(element.y * scale);
+    element.width = Math.round(element.width * scale);
+    element.height = Math.round(element.height * scale);
+
+    if (element.type === "text") {
+      element.fontSize = Math.max(12, Math.round(element.fontSize * scale));
+      element.baseline = Math.round(element.height - element.fontSize * 0.2);
+    }
+
+    if (element.type === "arrow") {
+      element.points = element.points.map(([x, y]) => [
+        Math.round(x * scale),
+        Math.round(y * scale),
+      ]) as typeof element.points;
+      element.strokeWidth = Math.max(1, Math.round(element.strokeWidth * Math.min(scale, 1.25)));
+    }
+  }
+}
+
+function clampScale(value: number): number {
+  if (!Number.isFinite(value)) return 1;
+  return Math.min(1.5, Math.max(0.75, Math.round(value * 100) / 100));
 }
 
 function chalkTitle(title: string, sourceLabel: string): string {

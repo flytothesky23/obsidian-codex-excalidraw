@@ -26,6 +26,7 @@ export interface DiagramOptions {
   sourceLabel: string;
   visualTheme: "chalkboard" | "whiteboard";
   handwritingFontFamily: number;
+  studyNoteFontScale: number;
   maxHeadingsPerNote: number;
   maxTagsPerNote: number;
   maxLinksPerNote: number;

@@ -16,6 +16,7 @@ import { buildDiagram, defaultDiagramOptions } from "./diagram";
 import { createScene, renderExcalidrawMarkdown } from "./excalidraw";
 import { buildNoteContext, truncate } from "./markdown";
 import { FolderSuggestModal, MultiFileModal } from "./modals";
+import { actionLabel, CODEX_PROMPT_PRESETS, type CodexPanelAction } from "./prompt-presets";
 import { CodexExcalidrawSettingTab, DEFAULT_SETTINGS, type CodexExcalidrawSettings } from "./settings";
 import type { NoteContext, NoteLink } from "./types";
 
@@ -41,6 +42,17 @@ export default class CodexExcalidrawPlugin extends Plugin {
       name: "Open Codex Excalidraw panel",
       callback: () => {
         void this.openCodexPanel();
+      },
+    });
+
+    this.addCommand({
+      id: "revise-active-excalidraw-with-codex-panel",
+      name: "Revise active Excalidraw drawing with Codex panel",
+      checkCallback: (checking) => {
+        const active = this.app.workspace.getActiveFile();
+        if (!active || !isExcalidrawDrawing(active)) return false;
+        if (!checking) void this.openCodexPanel();
+        return true;
       },
     });
 
@@ -157,6 +169,47 @@ export default class CodexExcalidrawPlugin extends Plugin {
     await this.copyCodexBrief(active);
   }
 
+  async runCodexPanelAction(action: CodexPanelAction, instruction: string): Promise<string> {
+    const active = this.app.workspace.getActiveFile();
+    if (!active) {
+      throw new Error("Open a Markdown note or Excalidraw drawing first.");
+    }
+
+    if (action === "revise-active") {
+      if (!isExcalidrawDrawing(active)) {
+        throw new Error("Open an .excalidraw.md drawing before using current-drawing revision.");
+      }
+      const summary = await this.reviseActiveDrawingWithCodex(active.path, instruction);
+      return summary || `Updated ${active.path}`;
+    }
+
+    if (isExcalidrawDrawing(active)) {
+      throw new Error("Open a source Markdown note for new study-note or diagram generation.");
+    }
+
+    const files = await this.expandLinkedNotes(active);
+    const contexts = await this.readNoteContexts(files, false);
+    const label = `${active.basename} ${actionLabel(action)}`;
+    const title = `${active.basename} ${actionLabel(action)}`;
+    const blankMarkdown = renderExcalidrawMarkdown(createScene([]), {
+      title,
+      sourcePaths: contexts.map((context) => context.path),
+    });
+    const path = await this.writeDrawing(blankMarkdown, label);
+
+    new Notice(`${actionLabel(action)} target created. Codex CLI is reading ${contexts.length} source note(s).`, 7000);
+    const summary = await this.refineWithCodex(contexts, path, instruction, action);
+
+    if (this.settings.openAfterCreate) {
+      const created = this.app.vault.getAbstractFileByPath(path);
+      if (created instanceof TFile) {
+        await this.openGeneratedDrawing(created);
+      }
+    }
+
+    return summary || `Created ${path}`;
+  }
+
   private async createFromFolder(folder: TFolder, runCodex = false): Promise<void> {
     const folderPrefix = folder.path && folder.path !== "/" ? `${folder.path}/` : "";
     const files = this.app.vault
@@ -188,7 +241,11 @@ export default class CodexExcalidrawPlugin extends Plugin {
         `Created semantic Codex target ${path}. Codex CLI is reading ${contexts.length} source note(s).`,
         7000,
       );
-      await this.refineWithCodex(contexts, path);
+      try {
+        await this.refineWithCodex(contexts, path, "", "study-note");
+      } catch (error) {
+        this.notifyCodexError(error);
+      }
     } else {
       const result = buildDiagram(
         contexts,
@@ -197,6 +254,7 @@ export default class CodexExcalidrawPlugin extends Plugin {
           label,
           this.settings.visualTheme,
           this.settings.handwritingFontFamily,
+          this.settings.studyNoteFontScale,
         ),
       );
       path = await this.writeDrawing(result.markdown, label);
@@ -218,21 +276,33 @@ export default class CodexExcalidrawPlugin extends Plugin {
     const files = await this.expandLinkedNotes(active);
     const contexts = await this.readNoteContexts(files);
     const targetPath = await this.nextDrawingPath(active.basename);
-    const brief = buildCodexBrief(contexts, targetPath);
+    const brief = buildCodexBrief(contexts, targetPath, this.codexBriefOptions());
     await navigator.clipboard.writeText(brief);
     new Notice(`Copied Codex drawing brief for ${contexts.length} note(s).`);
   }
 
-  private async refineWithCodex(contexts: NoteContext[], targetPath: string): Promise<void> {
+  private async refineWithCodex(
+    contexts: NoteContext[],
+    targetPath: string,
+    instruction = "",
+    action: CodexPanelAction = "study-note",
+  ): Promise<string> {
     const adapter = this.app.vault.adapter;
     if (!(adapter instanceof FileSystemAdapter)) {
-      new Notice("Codex CLI refinement requires the desktop filesystem adapter.");
-      return;
+      throw new Error("Codex CLI refinement requires the desktop filesystem adapter.");
     }
 
-    new Notice("Codex CLI is reading source notes and composing a semantic Excalidraw drawing...");
+    new Notice(`Codex CLI is composing ${actionLabel(action)}...`);
     const prompt = [
-      buildCodexBrief(contexts, targetPath),
+      buildCodexBrief(contexts, targetPath, this.codexBriefOptions()),
+      "",
+      "# Panel Action",
+      "",
+      panelActionPrompt(action),
+      "",
+      "# User Instruction",
+      "",
+      instruction.trim() || "No extra instruction. Prioritize readability, accurate synthesis, and editable Excalidraw text.",
       "",
       "# Execution",
       "",
@@ -243,21 +313,78 @@ export default class CodexExcalidrawPlugin extends Plugin {
       "After editing, report a concise summary of the visual logic you created and which source claims anchor it.",
     ].join("\n");
 
-    try {
-      const result = await runCodexExec({
-        command: this.settings.codexCommand,
-        cwd: adapter.getBasePath(),
-        prompt,
-        model: this.settings.codexModel,
-        reasoningEffort: this.settings.codexReasoningEffort,
-        timeoutMs: this.settings.codexTimeoutSeconds * 1000,
-      });
-      const summary = (result.stdout || result.stderr).trim().split(/\r?\n/).slice(-2).join(" ");
-      new Notice(`Codex CLI finished. ${summary ? summary.slice(0, 180) : "Drawing refined."}`, 10000);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      new Notice(`Codex CLI failed: ${message.slice(0, 220)}`, 12000);
+    const result = await runCodexExec({
+      command: this.settings.codexCommand,
+      cwd: adapter.getBasePath(),
+      prompt,
+      model: this.settings.codexModel,
+      reasoningEffort: this.settings.codexReasoningEffort,
+      timeoutMs: this.settings.codexTimeoutSeconds * 1000,
+    });
+    const summary = summarizeCodexResult(result.stdout || result.stderr);
+    new Notice(`Codex CLI finished. ${summary || "Drawing refined."}`, 10000);
+    return summary;
+  }
+
+  private async reviseActiveDrawingWithCodex(targetPath: string, instruction: string): Promise<string> {
+    const adapter = this.app.vault.adapter;
+    if (!(adapter instanceof FileSystemAdapter)) {
+      throw new Error("Codex CLI revision requires the desktop filesystem adapter.");
     }
+
+    const prompt = [
+      "# Codex Excalidraw Drawing Revision",
+      "",
+      "You are revising an existing Obsidian Excalidraw Markdown drawing from inside the vault root.",
+      `Target drawing: ${targetPath}`,
+      "",
+      "# Current Plugin Style Settings",
+      "",
+      `- Visual theme: ${this.settings.visualTheme}`,
+      `- Excalidraw fontFamily: ${this.settings.handwritingFontFamily}`,
+      `- Study note text scale: ${this.settings.studyNoteFontScale}`,
+      "",
+      "# User Instruction",
+      "",
+      instruction.trim() || "Improve readability and semantic clarity without changing the source meaning.",
+      "",
+      "# Execution",
+      "",
+      "Read the target drawing file first.",
+      "If the drawing frontmatter contains `codex_sources`, read those Markdown source notes before revising.",
+      "Edit only the target drawing file. Do not create unrelated files.",
+      "Keep editable Excalidraw text, rectangles, and arrows. Do not flatten the result into an image.",
+      "Fix overlapping text, tiny handwriting, raw block IDs, decorative colors, or dashboard/card clutter.",
+      "Prefer a teacher-at-the-board note: reading question, conclusion, evidence spine, caveat, and next check.",
+      "Use Excalidraw fontFamily 4 for Korean handwritten text when Local Font is available unless the user asks otherwise.",
+      "After editing, report what changed and which source logic the revision protects.",
+    ].join("\n");
+
+    new Notice("Codex CLI is revising the active Excalidraw drawing...");
+    const result = await runCodexExec({
+      command: this.settings.codexCommand,
+      cwd: adapter.getBasePath(),
+      prompt,
+      model: this.settings.codexModel,
+      reasoningEffort: this.settings.codexReasoningEffort,
+      timeoutMs: this.settings.codexTimeoutSeconds * 1000,
+    });
+    const summary = summarizeCodexResult(result.stdout || result.stderr);
+    new Notice(`Codex CLI finished. ${summary || "Active drawing revised."}`, 10000);
+    return summary;
+  }
+
+  private codexBriefOptions() {
+    return {
+      visualTheme: this.settings.visualTheme,
+      handwritingFontFamily: this.settings.handwritingFontFamily,
+      studyNoteFontScale: this.settings.studyNoteFontScale,
+    };
+  }
+
+  private notifyCodexError(error: unknown): void {
+    const message = error instanceof Error ? error.message : String(error);
+    new Notice(`Codex CLI failed: ${message.slice(0, 220)}`, 12000);
   }
 
   private async readNoteContexts(files: TFile[], truncateContent = true): Promise<NoteContext[]> {
@@ -399,7 +526,37 @@ function sanitizeFileName(value: string): string {
   return sanitized || "Codex Map";
 }
 
+function isExcalidrawDrawing(file: TFile): boolean {
+  return file.path.endsWith(".excalidraw.md");
+}
+
+function panelActionPrompt(action: CodexPanelAction): string {
+  switch (action) {
+    case "study-note":
+      return "Create a one-screen Korean handwritten study note that improves understanding more than the original Markdown.";
+    case "context-map":
+      return "Create a semantic context diagram: synthesize claims, causes, evidence, tensions, and follow-up questions across the source notes.";
+    case "svg-sketch":
+      return "Create an editable Excalidraw drawing with SVG-like diagram discipline: clean geometry, strong hierarchy, minimal color, and readable handwritten labels.";
+    case "revise-active":
+      return "Revise the active drawing according to the user's instruction while preserving source-backed meaning.";
+  }
+}
+
+function summarizeCodexResult(value: string): string {
+  return value
+    .trim()
+    .split(/\r?\n/)
+    .filter((line) => line.trim().length > 0)
+    .slice(-3)
+    .join(" ")
+    .slice(0, 220);
+}
+
 class CodexExcalidrawPanelView extends ItemView {
+  private promptValue = "";
+  private statusText = "";
+
   constructor(leaf: WorkspaceLeaf, private plugin: CodexExcalidrawPlugin) {
     super(leaf);
   }
@@ -434,27 +591,57 @@ class CodexExcalidrawPanelView extends ItemView {
     const active = this.plugin.app.workspace.getActiveFile();
     root.createDiv({
       cls: "codex-excalidraw-panel-current",
-      text: active ? active.path : "No active Markdown note",
+      text: active ? active.path : "No active Markdown note or Excalidraw drawing",
     });
+
+    this.renderControls(root);
 
     const prompt = root.createEl("textarea");
     prompt.addClass("codex-excalidraw-panel-prompt");
-    prompt.placeholder = "생성 방향 메모: 예) 칠판 필기처럼, 핵심 지표와 다음 확인사항을 더 풍부하게";
+    prompt.value = this.promptValue;
+    prompt.placeholder = "Codex에게 지시: 예) 글씨와 여백을 키우고, 질문-결론-근거-반례-다음 확인사항 구조로 다시 정리해줘";
+    prompt.addEventListener("input", () => {
+      this.promptValue = prompt.value;
+    });
+
+    const presetWrap = root.createDiv({ cls: "codex-excalidraw-panel-presets" });
+    for (const preset of CODEX_PROMPT_PRESETS) {
+      this.addButton(presetWrap, preset.label, () => {
+        this.promptValue = [this.promptValue.trim(), preset.instruction]
+          .filter(Boolean)
+          .join("\n");
+        this.statusText = `프롬프트 추가: ${preset.label}`;
+        this.render();
+      });
+    }
 
     const actions = root.createDiv({ cls: "codex-excalidraw-panel-actions" });
-    this.addButton(actions, "한눈필기 생성", () => {
+    this.addButton(actions, "노트→한눈필기", () => {
       void this.plugin.createFromCurrentNote(false);
     });
-    this.addButton(actions, "Codex CLI로 생성", () => {
-      void this.plugin.createFromCurrentNote(true);
+    this.addButton(actions, "Codex 한눈필기", () => {
+      void this.runPanelAction("study-note");
+    });
+    this.addButton(actions, "Codex 맥락도", () => {
+      void this.runPanelAction("context-map");
+    });
+    this.addButton(actions, "현재 드로잉 수정", () => {
+      void this.runPanelAction("revise-active");
+    });
+    this.addButton(actions, "SVG식 도식", () => {
+      void this.runPanelAction("svg-sketch");
     });
     this.addButton(actions, "브리프 복사", () => {
       void this.plugin.copyCurrentCodexBrief();
     });
 
+    if (this.statusText) {
+      root.createDiv({ cls: "codex-excalidraw-panel-status", text: this.statusText });
+    }
+
     root.createEl("p", {
       cls: "codex-excalidraw-panel-note",
-      text: "현재 버전은 명령 실행 패널입니다. 대화형 수정 루프는 이 view 위에 이어 붙일 수 있습니다.",
+      text: "Codex CLI는 한 번의 지시마다 실행됩니다. 현재 노트에서는 새 드로잉을 만들고, .excalidraw.md에서는 현재 드로잉을 직접 수정합니다.",
     });
   }
 
@@ -462,4 +649,72 @@ class CodexExcalidrawPanelView extends ItemView {
     const button = parent.createEl("button", { text: label });
     button.addEventListener("click", onClick);
   }
+
+  private renderControls(root: HTMLElement): void {
+    const controls = root.createDiv({ cls: "codex-excalidraw-panel-controls" });
+
+    const themeRow = controls.createDiv({ cls: "codex-excalidraw-panel-control-row" });
+    themeRow.createSpan({ text: "테마" });
+    const themeSelect = themeRow.createEl("select");
+    addOption(themeSelect, "chalkboard", "칠판");
+    addOption(themeSelect, "whiteboard", "화이트보드");
+    themeSelect.value = this.plugin.settings.visualTheme;
+    themeSelect.addEventListener("change", () => {
+      this.plugin.settings.visualTheme = themeSelect.value === "whiteboard" ? "whiteboard" : "chalkboard";
+      void this.plugin.saveSettings();
+    });
+
+    const fontRow = controls.createDiv({ cls: "codex-excalidraw-panel-control-row" });
+    fontRow.createSpan({ text: "폰트" });
+    const fontSelect = fontRow.createEl("select");
+    addOption(fontSelect, "4", "Local Font");
+    addOption(fontSelect, "1", "Virgil");
+    addOption(fontSelect, "2", "Normal");
+    addOption(fontSelect, "3", "Code");
+    fontSelect.value = String(this.plugin.settings.handwritingFontFamily);
+    fontSelect.addEventListener("change", () => {
+      this.plugin.settings.handwritingFontFamily = Number.parseInt(fontSelect.value, 10) || DEFAULT_SETTINGS.handwritingFontFamily;
+      void this.plugin.saveSettings();
+    });
+
+    const scaleRow = controls.createDiv({ cls: "codex-excalidraw-panel-control-row" });
+    scaleRow.createSpan({ text: "글자" });
+    const scaleInput = scaleRow.createEl("input");
+    scaleInput.type = "range";
+    scaleInput.min = "0.75";
+    scaleInput.max = "1.50";
+    scaleInput.step = "0.05";
+    scaleInput.value = String(this.plugin.settings.studyNoteFontScale);
+    const scaleValue = scaleRow.createSpan({
+      cls: "codex-excalidraw-panel-scale-value",
+      text: `${this.plugin.settings.studyNoteFontScale.toFixed(2)}x`,
+    });
+    scaleInput.addEventListener("input", () => {
+      const nextScale = Math.round(Number.parseFloat(scaleInput.value) * 100) / 100;
+      this.plugin.settings.studyNoteFontScale = nextScale;
+      scaleValue.setText(`${nextScale.toFixed(2)}x`);
+      void this.plugin.saveSettings();
+    });
+  }
+
+  private async runPanelAction(action: CodexPanelAction): Promise<void> {
+    this.statusText = `${actionLabel(action)} 실행 중...`;
+    this.render();
+    try {
+      const summary = await this.plugin.runCodexPanelAction(action, this.promptValue);
+      this.statusText = summary || `${actionLabel(action)} 완료`;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.statusText = `실패: ${message.slice(0, 220)}`;
+      new Notice(this.statusText, 12000);
+    }
+    this.render();
+  }
+}
+
+function addOption(select: HTMLSelectElement, value: string, label: string): void {
+  const option = document.createElement("option");
+  option.value = value;
+  option.text = label;
+  select.appendChild(option);
 }
