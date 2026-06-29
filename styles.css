@@ -1,0 +1,77 @@
+.codex-excalidraw-modal .codex-excalidraw-controls {
+  display: flex;
+  gap: 8px;
+  margin: 8px 0 12px;
+}
+
+.codex-excalidraw-file-list {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  max-height: 360px;
+  overflow: auto;
+  padding: 4px;
+}
+
+.codex-excalidraw-file-row {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  padding: 4px 6px;
+}
+
+.codex-excalidraw-file-row:hover {
+  background: var(--background-modifier-hover);
+}
+
+.codex-excalidraw-settings input[type="text"] {
+  min-width: 260px;
+}
+
+.codex-excalidraw-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+}
+
+.codex-excalidraw-panel h2 {
+  font-size: 18px;
+  margin: 0;
+}
+
+.codex-excalidraw-panel-current {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.4;
+  padding: 8px;
+  word-break: break-word;
+}
+
+.codex-excalidraw-panel-prompt {
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  min-height: 120px;
+  padding: 8px;
+  resize: vertical;
+  width: 100%;
+}
+
+.codex-excalidraw-panel-actions {
+  display: grid;
+  gap: 8px;
+}
+
+.codex-excalidraw-panel-actions button {
+  justify-content: center;
+  width: 100%;
+}
+
+.codex-excalidraw-panel-note {
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+  margin: 0;
+}
