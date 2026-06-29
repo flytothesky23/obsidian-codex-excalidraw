@@ -3,6 +3,7 @@ import type CodexExcalidrawPlugin from "./plugin";
 
 export interface CodexExcalidrawSettings {
   outputFolder: string;
+  autoOpenPanel: boolean;
   visualTheme: "chalkboard" | "whiteboard";
   handwritingFontFamily: number;
   studyNoteFontScale: number;
@@ -19,6 +20,7 @@ export interface CodexExcalidrawSettings {
 
 export const DEFAULT_SETTINGS: CodexExcalidrawSettings = {
   outputFolder: "Excalidraw/Codex Maps",
+  autoOpenPanel: true,
   visualTheme: "chalkboard",
   handwritingFontFamily: 4,
   studyNoteFontScale: 1,
@@ -45,7 +47,7 @@ export class CodexExcalidrawSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("Output folder")
-      .setDesc("Generated .excalidraw.md files are created here.")
+      .setDesc("Generated .excalidraw.md and .canvas files are created here.")
       .addText((text) =>
         text
           .setPlaceholder("Excalidraw/Codex Maps")
@@ -54,6 +56,16 @@ export class CodexExcalidrawSettingTab extends PluginSettingTab {
             this.plugin.settings.outputFolder = value.trim() || DEFAULT_SETTINGS.outputFolder;
             await this.plugin.saveSettings();
           }),
+      );
+
+    new Setting(containerEl)
+      .setName("Open Codex side panel on startup")
+      .setDesc("Shows the Codex drawing panel in the right sidebar when Obsidian loads this plugin.")
+      .addToggle((toggle) =>
+        toggle.setValue(this.plugin.settings.autoOpenPanel).onChange(async (value) => {
+          this.plugin.settings.autoOpenPanel = value;
+          await this.plugin.saveSettings();
+        }),
       );
 
     new Setting(containerEl)

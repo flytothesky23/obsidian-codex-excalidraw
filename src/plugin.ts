@@ -35,13 +35,19 @@ export default class CodexExcalidrawPlugin extends Plugin {
       (leaf) => new CodexExcalidrawPanelView(leaf, this),
     );
 
-    this.addRibbonIcon("network", "Create Codex Excalidraw map", () => {
-      void this.createFromCurrentNote();
+    this.addRibbonIcon("panel-right-open", "Open Codex drawing panel", () => {
+      void this.openCodexPanel();
+    });
+
+    this.app.workspace.onLayoutReady(() => {
+      if (this.settings.autoOpenPanel) {
+        void this.openCodexPanel(false);
+      }
     });
 
     this.addCommand({
       id: "open-codex-excalidraw-panel",
-      name: "Open Codex Excalidraw panel",
+      name: "Open Codex drawing side panel",
       callback: () => {
         void this.openCodexPanel();
       },
@@ -164,10 +170,18 @@ export default class CodexExcalidrawPlugin extends Plugin {
     await this.saveData(this.settings);
   }
 
-  async openCodexPanel(): Promise<void> {
+  async openCodexPanel(showNotice = true): Promise<void> {
+    const existing = this.app.workspace.getLeavesOfType(CODEX_EXCALIDRAW_PANEL_VIEW)[0];
+    if (existing) {
+      this.app.workspace.revealLeaf(existing);
+      return;
+    }
+
     const leaf = this.app.workspace.getRightLeaf(false) ?? this.app.workspace.getRightLeaf(true);
     if (!leaf) {
-      new Notice("Could not open the Codex Excalidraw side panel.");
+      if (showNotice) {
+        new Notice("Could not open the Codex drawing side panel.");
+      }
       return;
     }
     await leaf.setViewState({ type: CODEX_EXCALIDRAW_PANEL_VIEW, active: true });
@@ -756,7 +770,7 @@ class CodexExcalidrawPanelView extends ItemView {
   }
 
   getDisplayText(): string {
-    return "Codex Excalidraw";
+    return "Codex Drawing";
   }
 
   getIcon(): string {
@@ -776,7 +790,7 @@ class CodexExcalidrawPanelView extends ItemView {
     const { contentEl } = this;
     contentEl.empty();
     const root = contentEl.createDiv({ cls: "codex-excalidraw-panel" });
-    root.createEl("h2", { text: "Codex Excalidraw" });
+    root.createEl("h2", { text: "Codex Drawing" });
 
     const active = this.plugin.app.workspace.getActiveFile();
     root.createDiv({
@@ -834,7 +848,7 @@ class CodexExcalidrawPanelView extends ItemView {
 
     root.createEl("p", {
       cls: "codex-excalidraw-panel-note",
-      text: "Codex CLI는 한 번의 지시마다 실행됩니다. 현재 노트에서는 새 드로잉을 만들고, .excalidraw.md에서는 현재 드로잉을 직접 수정합니다.",
+      text: "Codex CLI는 한 번의 지시마다 실행됩니다. 현재 노트에서는 새 드로잉이나 Canvas를 만들고, .excalidraw.md/.canvas에서는 현재 파일을 직접 수정합니다.",
     });
   }
 

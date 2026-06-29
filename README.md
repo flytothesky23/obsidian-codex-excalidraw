@@ -15,7 +15,7 @@ This plugin also supports Obsidian Canvas JSON workflows inspired by the Claude 
 - `Create Obsidian Canvas from current note`
 - `Create Obsidian Canvas from current note with Codex CLI`
 - `Copy Codex drawing brief for current note`
-- `Open Codex Excalidraw panel`
+- `Open Codex drawing side panel`
 - `Revise active Excalidraw drawing with Codex panel`
 
 The generated files are `.excalidraw.md` Markdown drawings compatible with the Obsidian Excalidraw plugin.
@@ -23,7 +23,7 @@ The non-Codex commands create a deterministic local draft. The Codex CLI command
 
 ## Codex side panel
 
-Open `Codex Excalidraw` in the right sidebar to drive drawing work with short instructions:
+The plugin opens `Codex Drawing` in the right sidebar on startup by default. The left ribbon icon also opens the panel. Use it to drive drawing work with short instructions:
 
 - create a Korean handwritten study note from the current Markdown note
 - create a semantic context diagram from the current note and linked notes
