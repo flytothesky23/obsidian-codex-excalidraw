@@ -17,4 +17,17 @@ describe("Codex drawing panel entry points", () => {
     expect(pluginSource).toContain("this.settings.autoOpenPanel");
     expect(pluginSource).toContain("void this.openCodexPanel(false)");
   });
+
+  it("exposes chat and Codexian handoff actions in the side panel", () => {
+    expect(pluginSource).toContain("runCodexChat");
+    expect(pluginSource).toContain("openActiveFileInCodexian");
+    expect(pluginSource).toContain("대화 보내기");
+    expect(pluginSource).toContain("Codexian 열기");
+    expect(pluginSource).toContain("getCodexRuntimeSummary");
+  });
+
+  it("uses Codexian settings as the default runtime source", () => {
+    expect(settingsSource).toContain('codexSettingsSource: "codexian"');
+    expect(settingsSource).toContain("Codexian settings (recommended)");
+  });
 });

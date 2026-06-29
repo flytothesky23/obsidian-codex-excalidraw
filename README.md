@@ -33,6 +33,20 @@ The plugin opens `Codex Drawing` in the right sidebar on startup by default. The
 
 The panel includes reusable prompt presets for readability, teacher-at-the-board notes, logic-spine extraction, whiteboard conversion, compact summaries, and content enrichment.
 
+The panel also includes a lightweight Codex chat area. It reads the active file as context, answers in the panel, and only edits vault files when the user explicitly asks for an edit. The `Codexian 열기` action hands the active note to the installed Codexian plugin and opens Codexian's own chat panel.
+
+## Codexian integration
+
+By default, Codex Excalidraw uses the existing Codexian plugin runtime settings when Codexian is loaded:
+
+- `codexCliPath`
+- `codexModel`
+- `reasoningEffort`
+- `permissionMode`
+- `environmentVariables`
+
+Custom Codex settings in this plugin are fallback values only. The plugin does not rewrite global Codex CLI configuration and does not overwrite Codexian or Marktl operating `data.json` files.
+
 ## Obsidian Canvas mode
 
 Canvas mode is for the workflow shown in the reference video:
@@ -55,7 +69,7 @@ The settings tab includes:
 
 The actual Korean handwriting TTF is still configured in the Obsidian Excalidraw plugin's Local Font settings.
 
-On macOS, Obsidian may not inherit the terminal `PATH`. If Codex actions show `spawn codex ENOENT`, set `Codex CLI command` to an absolute path such as `/Users/flytothesky/.local/bin/codexian-codex` or `/opt/homebrew/bin/codex`. The plugin auto-resolves bare `codex` to those paths when available.
+On macOS, Obsidian may not inherit the terminal `PATH`. When Codexian is installed, this plugin reuses Codexian's environment variables so the same `CODEX_HOME`, `PATH`, and wrapper command are used. If Codexian is not loaded, set the custom fallback command to an absolute path such as `/Users/flytothesky/.local/bin/codexian-codex` or `/opt/homebrew/bin/codex`.
 
 ## BRAT install
 

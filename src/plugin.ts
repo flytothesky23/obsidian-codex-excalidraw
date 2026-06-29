@@ -13,7 +13,12 @@ import {
 import { buildCanvas } from "./canvas";
 import { buildCanvasBrief } from "./canvas-brief";
 import { buildCodexBrief } from "./codex-brief";
-import { resolveCodexCommand, runCodexExec } from "./codex-cli";
+import { runCodexExec } from "./codex-cli";
+import {
+  getCodexianPlugin,
+  getCodexianRuntime,
+  type CodexRuntimeConfig,
+} from "./codexian-bridge";
 import { buildDiagram, defaultDiagramOptions } from "./diagram";
 import { createScene, renderExcalidrawMarkdown } from "./excalidraw";
 import { buildNoteContext, truncate } from "./markdown";
@@ -164,11 +169,6 @@ export default class CodexExcalidrawPlugin extends Plugin {
 
   async loadSettings(): Promise<void> {
     this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
-    const resolvedCodexCommand = resolveCodexCommand(this.settings.codexCommand);
-    if (this.settings.codexCommand.trim() === "codex" && resolvedCodexCommand !== "codex") {
-      this.settings.codexCommand = resolvedCodexCommand;
-      await this.saveSettings();
-    }
   }
 
   async saveSettings(): Promise<void> {
@@ -279,6 +279,78 @@ export default class CodexExcalidrawPlugin extends Plugin {
     }
 
     return summary || `Created ${path}`;
+  }
+
+  async runCodexChat(
+    instruction: string,
+    onUpdate?: (chunk: string, stream: "stdout" | "stderr") => void,
+  ): Promise<string> {
+    const adapter = this.app.vault.adapter;
+    if (!(adapter instanceof FileSystemAdapter)) {
+      throw new Error("Codex chat requires the desktop filesystem adapter.");
+    }
+    const trimmedInstruction = instruction.trim();
+    if (!trimmedInstruction) {
+      throw new Error("Codex에게 보낼 지시를 입력하세요.");
+    }
+
+    const active = this.app.workspace.getActiveFile();
+    const activeContent = active instanceof TFile
+      ? truncate(await this.app.vault.cachedRead(active), this.settings.maxCharactersPerNote)
+      : "";
+    const prompt = [
+      "# Codex Drawing Side Panel Chat",
+      "",
+      "You are running inside an Obsidian vault from the Codex drawing side panel.",
+      "Answer in Korean unless the user asks otherwise.",
+      "Use the current vault files as the working source of truth.",
+      "If the user explicitly asks to edit the current drawing, Canvas, SVG, or Markdown note, edit only the active target file unless they name another file.",
+      "If the user is asking a question, answer directly and do not modify files.",
+      "When creating or revising visual notes, prefer readable teacher-board structure: question, provisional conclusion, evidence, tension, caveat, next check.",
+      "",
+      "# Active File",
+      "",
+      active ? active.path : "No active file.",
+      "",
+      "# Active File Content",
+      "",
+      activeContent || "No active file content loaded.",
+      "",
+      "# User Message",
+      "",
+      trimmedInstruction,
+    ].join("\n");
+
+    const result = await this.runCodex(prompt, {
+      onStdout: (chunk) => onUpdate?.(chunk, "stdout"),
+      onStderr: (chunk) => onUpdate?.(chunk, "stderr"),
+    });
+    return (result.stdout || result.stderr).trim() || "Codex 응답이 비어 있습니다.";
+  }
+
+  async openActiveFileInCodexian(): Promise<void> {
+    const codexian = getCodexianPlugin(this.app);
+    if (!codexian) {
+      new Notice("Codexian plugin is not loaded in this vault.");
+      return;
+    }
+
+    const active = this.app.workspace.getActiveFile();
+    if (active?.extension === "md" && codexian.pinNote) {
+      await Promise.resolve(codexian.pinNote(active.path));
+    } else if (codexian.attachCurrentNoteToChat) {
+      await Promise.resolve(codexian.attachCurrentNoteToChat());
+    }
+
+    await Promise.resolve(codexian.activateView?.());
+    codexian.refreshOpenViews?.();
+    new Notice("Codexian panel opened with the current note context.");
+  }
+
+  getCodexRuntimeSummary(): string {
+    const runtime = this.getCodexRuntime();
+    const label = runtime.source === "codexian" ? "Codexian" : "Custom";
+    return `${label}: ${runtime.command} · ${runtime.model ?? "configured model"} · ${runtime.reasoningEffort ?? "configured reasoning"} · ${runtime.permissionMode}`;
   }
 
   private async createFromFolder(folder: TFolder, runCodex = false): Promise<void> {
@@ -415,14 +487,7 @@ export default class CodexExcalidrawPlugin extends Plugin {
       "After editing, report a concise summary of the visual logic you created and which source claims anchor it.",
     ].join("\n");
 
-    const result = await runCodexExec({
-      command: this.settings.codexCommand,
-      cwd: adapter.getBasePath(),
-      prompt,
-      model: this.settings.codexModel,
-      reasoningEffort: this.settings.codexReasoningEffort,
-      timeoutMs: this.settings.codexTimeoutSeconds * 1000,
-    });
+    const result = await this.runCodex(prompt);
     const summary = summarizeCodexResult(result.stdout || result.stderr);
     new Notice(`Codex CLI finished. ${summary || "Drawing refined."}`, 10000);
     return summary;
@@ -463,14 +528,7 @@ export default class CodexExcalidrawPlugin extends Plugin {
     ].join("\n");
 
     new Notice("Codex CLI is revising the active Excalidraw drawing...");
-    const result = await runCodexExec({
-      command: this.settings.codexCommand,
-      cwd: adapter.getBasePath(),
-      prompt,
-      model: this.settings.codexModel,
-      reasoningEffort: this.settings.codexReasoningEffort,
-      timeoutMs: this.settings.codexTimeoutSeconds * 1000,
-    });
+    const result = await this.runCodex(prompt);
     const summary = summarizeCodexResult(result.stdout || result.stderr);
     new Notice(`Codex CLI finished. ${summary || "Active drawing revised."}`, 10000);
     return summary;
@@ -501,14 +559,7 @@ export default class CodexExcalidrawPlugin extends Plugin {
     ].join("\n");
 
     new Notice("Codex CLI is composing an Obsidian Canvas JSON file...");
-    const result = await runCodexExec({
-      command: this.settings.codexCommand,
-      cwd: adapter.getBasePath(),
-      prompt,
-      model: this.settings.codexModel,
-      reasoningEffort: this.settings.codexReasoningEffort,
-      timeoutMs: this.settings.codexTimeoutSeconds * 1000,
-    });
+    const result = await this.runCodex(prompt);
     const summary = summarizeCodexResult(result.stdout || result.stderr);
     new Notice(`Codex CLI finished. ${summary || "Canvas refined."}`, 10000);
     return summary;
@@ -544,14 +595,7 @@ export default class CodexExcalidrawPlugin extends Plugin {
     ].join("\n");
 
     new Notice("Codex CLI is revising the active Obsidian Canvas...");
-    const result = await runCodexExec({
-      command: this.settings.codexCommand,
-      cwd: adapter.getBasePath(),
-      prompt,
-      model: this.settings.codexModel,
-      reasoningEffort: this.settings.codexReasoningEffort,
-      timeoutMs: this.settings.codexTimeoutSeconds * 1000,
-    });
+    const result = await this.runCodex(prompt);
     const summary = summarizeCodexResult(result.stdout || result.stderr);
     new Notice(`Codex CLI finished. ${summary || "Canvas revised."}`, 10000);
     return summary;
@@ -562,6 +606,48 @@ export default class CodexExcalidrawPlugin extends Plugin {
       visualTheme: this.settings.visualTheme,
       handwritingFontFamily: this.settings.handwritingFontFamily,
       studyNoteFontScale: this.settings.studyNoteFontScale,
+    };
+  }
+
+  private async runCodex(
+    prompt: string,
+    callbacks: {
+      onStdout?: (chunk: string) => void;
+      onStderr?: (chunk: string) => void;
+    } = {},
+  ) {
+    const adapter = this.app.vault.adapter;
+    if (!(adapter instanceof FileSystemAdapter)) {
+      throw new Error("Codex CLI requires the desktop filesystem adapter.");
+    }
+    const runtime = this.getCodexRuntime();
+    return runCodexExec({
+      command: runtime.command,
+      cwd: adapter.getBasePath(),
+      prompt,
+      model: runtime.model,
+      reasoningEffort: runtime.reasoningEffort,
+      permissionMode: runtime.permissionMode,
+      environmentVariables: runtime.environmentVariables,
+      timeoutMs: this.settings.codexTimeoutSeconds * 1000,
+      onStdout: callbacks.onStdout,
+      onStderr: callbacks.onStderr,
+    });
+  }
+
+  private getCodexRuntime(): CodexRuntimeConfig {
+    const codexianRuntime = this.settings.codexSettingsSource !== "custom"
+      ? getCodexianRuntime(this.app)
+      : null;
+    if (codexianRuntime) return codexianRuntime;
+
+    return {
+      source: "custom",
+      command: this.settings.codexCommand,
+      model: this.settings.codexModel,
+      reasoningEffort: this.settings.codexReasoningEffort,
+      permissionMode: this.settings.codexPermissionMode,
+      environmentVariables: this.settings.codexEnvironmentVariables,
     };
   }
 
@@ -762,9 +848,16 @@ function summarizeCodexResult(value: string): string {
     .slice(0, 220);
 }
 
+interface PanelMessage {
+  role: "user" | "assistant";
+  text: string;
+}
+
 class CodexExcalidrawPanelView extends ItemView {
   private promptValue = "";
   private statusText = "";
+  private isRunning = false;
+  private messages: PanelMessage[] = [];
 
   constructor(leaf: WorkspaceLeaf, private plugin: CodexExcalidrawPlugin) {
     super(leaf);
@@ -802,8 +895,13 @@ class CodexExcalidrawPanelView extends ItemView {
       cls: "codex-excalidraw-panel-current",
       text: active ? active.path : "No active Markdown note or Excalidraw drawing",
     });
+    root.createDiv({
+      cls: "codex-excalidraw-panel-runtime",
+      text: this.plugin.getCodexRuntimeSummary(),
+    });
 
     this.renderControls(root);
+    this.renderChat(root);
 
     const prompt = root.createEl("textarea");
     prompt.addClass("codex-excalidraw-panel-prompt");
@@ -825,6 +923,12 @@ class CodexExcalidrawPanelView extends ItemView {
     }
 
     const actions = root.createDiv({ cls: "codex-excalidraw-panel-actions" });
+    this.addButton(actions, this.isRunning ? "Codex 응답 중..." : "대화 보내기", () => {
+      void this.runChat();
+    }, this.isRunning);
+    this.addButton(actions, "Codexian 열기", () => {
+      void this.plugin.openActiveFileInCodexian();
+    });
     this.addButton(actions, "노트→한눈필기", () => {
       void this.plugin.createFromCurrentNote(false);
     });
@@ -853,12 +957,38 @@ class CodexExcalidrawPanelView extends ItemView {
 
     root.createEl("p", {
       cls: "codex-excalidraw-panel-note",
-      text: "Codex CLI는 한 번의 지시마다 실행됩니다. 현재 노트에서는 새 드로잉이나 Canvas를 만들고, .excalidraw.md/.canvas에서는 현재 파일을 직접 수정합니다.",
+      text: "Codexian 설정을 우선 사용합니다. 대화는 현재 노트를 맥락으로 읽고, 명시적으로 수정 요청을 받은 경우에만 현재 드로잉·Canvas·노트를 편집합니다.",
     });
   }
 
-  private addButton(parent: HTMLElement, label: string, onClick: () => void): void {
+  private renderChat(root: HTMLElement): void {
+    const chat = root.createDiv({ cls: "codex-excalidraw-panel-chat" });
+    if (this.messages.length === 0) {
+      chat.createDiv({
+        cls: "codex-excalidraw-panel-chat-empty",
+        text: "Codex와 대화하면서 현재 노트, Excalidraw, Canvas 수정 방향을 바로 지시할 수 있습니다.",
+      });
+      return;
+    }
+
+    for (const message of this.messages) {
+      const bubble = chat.createDiv({
+        cls: `codex-excalidraw-panel-message codex-excalidraw-panel-message-${message.role}`,
+      });
+      bubble.createDiv({
+        cls: "codex-excalidraw-panel-message-role",
+        text: message.role === "user" ? "나" : "Codex",
+      });
+      bubble.createDiv({
+        cls: "codex-excalidraw-panel-message-text",
+        text: message.text || (message.role === "assistant" ? "응답 수신 중..." : ""),
+      });
+    }
+  }
+
+  private addButton(parent: HTMLElement, label: string, onClick: () => void, disabled = false): void {
     const button = parent.createEl("button", { text: label });
+    button.disabled = disabled;
     button.addEventListener("click", onClick);
   }
 
@@ -921,6 +1051,45 @@ class CodexExcalidrawPanelView extends ItemView {
       new Notice(this.statusText, 12000);
     }
     this.render();
+  }
+
+  private async runChat(): Promise<void> {
+    if (this.isRunning) return;
+    const message = this.promptValue.trim();
+    if (!message) {
+      this.statusText = "Codex에게 보낼 지시를 입력하세요.";
+      this.render();
+      return;
+    }
+
+    this.messages.push({ role: "user", text: message });
+    const assistantMessage: PanelMessage = { role: "assistant", text: "" };
+    this.messages.push(assistantMessage);
+    this.promptValue = "";
+    this.isRunning = true;
+    this.statusText = "Codex가 현재 맥락을 읽는 중...";
+    this.render();
+
+    try {
+      const finalText = await this.plugin.runCodexChat(message, (chunk, stream) => {
+        if (stream === "stdout") {
+          assistantMessage.text = `${assistantMessage.text}${chunk}`.slice(-6000);
+        } else {
+          this.statusText = chunk.trim().slice(-240) || "Codex 실행 중...";
+        }
+        this.render();
+      });
+      assistantMessage.text = finalText;
+      this.statusText = "Codex 응답 완료";
+    } catch (error) {
+      const text = error instanceof Error ? error.message : String(error);
+      assistantMessage.text = `실패: ${text}`;
+      this.statusText = `실패: ${text.slice(0, 220)}`;
+      new Notice(this.statusText, 12000);
+    } finally {
+      this.isRunning = false;
+      this.render();
+    }
   }
 }
 

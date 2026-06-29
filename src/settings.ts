@@ -1,5 +1,7 @@
 import { App, PluginSettingTab, Setting } from "obsidian";
+import { getCodexianRuntime } from "./codexian-bridge";
 import type CodexExcalidrawPlugin from "./plugin";
+import type { CodexPermissionMode, CodexReasoningEffort } from "./codexian-bridge";
 
 export interface CodexExcalidrawSettings {
   outputFolder: string;
@@ -12,9 +14,12 @@ export interface CodexExcalidrawSettings {
   maxNotesPerDiagram: number;
   maxCharactersPerNote: number;
   openAfterCreate: boolean;
+  codexSettingsSource: "codexian" | "custom";
   codexCommand: string;
   codexModel: string;
-  codexReasoningEffort: "low" | "medium" | "high" | "xhigh";
+  codexReasoningEffort: CodexReasoningEffort;
+  codexPermissionMode: CodexPermissionMode;
+  codexEnvironmentVariables: string;
   codexTimeoutSeconds: number;
 }
 
@@ -29,9 +34,12 @@ export const DEFAULT_SETTINGS: CodexExcalidrawSettings = {
   maxNotesPerDiagram: 40,
   maxCharactersPerNote: 12000,
   openAfterCreate: true,
+  codexSettingsSource: "codexian",
   codexCommand: "codex",
   codexModel: "gpt-5.5",
   codexReasoningEffort: "xhigh",
+  codexPermissionMode: "review",
+  codexEnvironmentVariables: "",
   codexTimeoutSeconds: 180,
 };
 
@@ -179,8 +187,33 @@ export class CodexExcalidrawSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
+      .setName("Codex settings source")
+      .setDesc("Use the existing Codexian plugin settings when available. Custom settings are only a fallback.")
+      .addDropdown((dropdown) =>
+        dropdown
+          .addOptions({
+            codexian: "Codexian settings (recommended)",
+            custom: "Custom fallback",
+          })
+          .setValue(this.plugin.settings.codexSettingsSource)
+          .onChange(async (value) => {
+            this.plugin.settings.codexSettingsSource = value === "custom" ? "custom" : "codexian";
+            await this.plugin.saveSettings();
+            this.display();
+          }),
+      );
+
+    const codexianRuntime = getCodexianRuntime(this.app);
+    containerEl.createDiv({
+      cls: "codex-excalidraw-settings-runtime",
+      text: codexianRuntime
+        ? `Codexian detected: ${codexianRuntime.command} · ${codexianRuntime.model ?? "configured model"} · ${codexianRuntime.reasoningEffort ?? "configured reasoning"}`
+        : "Codexian runtime was not detected. Custom fallback settings will be used.",
+    });
+
+    new Setting(containerEl)
       .setName("Codex CLI command")
-      .setDesc("Used by the “with Codex CLI” commands. macOS Obsidian usually needs an absolute path such as /Users/flytothesky/.local/bin/codexian-codex or /opt/homebrew/bin/codex.")
+      .setDesc("Custom fallback only. When Codexian settings are selected, Codexian's Codex CLI path is used instead.")
       .addText((text) =>
         text.setValue(this.plugin.settings.codexCommand).onChange(async (value) => {
           this.plugin.settings.codexCommand = value.trim() || DEFAULT_SETTINGS.codexCommand;
@@ -190,7 +223,7 @@ export class CodexExcalidrawSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("Codex CLI model")
-      .setDesc("Model used for semantic drawing generation.")
+      .setDesc("Custom fallback only. Codexian's model is used when Codexian settings are selected.")
       .addText((text) =>
         text.setValue(this.plugin.settings.codexModel).onChange(async (value) => {
           this.plugin.settings.codexModel = value.trim() || DEFAULT_SETTINGS.codexModel;
@@ -211,10 +244,42 @@ export class CodexExcalidrawSettingTab extends PluginSettingTab {
           })
           .setValue(this.plugin.settings.codexReasoningEffort)
           .onChange(async (value) => {
-            this.plugin.settings.codexReasoningEffort = value as CodexExcalidrawSettings["codexReasoningEffort"];
+            this.plugin.settings.codexReasoningEffort = value as CodexReasoningEffort;
             await this.plugin.saveSettings();
           }),
       );
+
+    new Setting(containerEl)
+      .setName("Codex permission mode")
+      .setDesc("Custom fallback only. Review maps to workspace-write sandbox, Auto maps to full-auto, Yolo bypasses approvals and sandbox.")
+      .addDropdown((dropdown) =>
+        dropdown
+          .addOptions({
+            review: "review",
+            auto: "auto",
+            yolo: "yolo",
+          })
+          .setValue(this.plugin.settings.codexPermissionMode)
+          .onChange(async (value) => {
+            this.plugin.settings.codexPermissionMode = value as CodexPermissionMode;
+            await this.plugin.saveSettings();
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName("Codex environment variables")
+      .setDesc("Custom fallback only. One KEY=VALUE per line, same style as Codexian's environment settings.")
+      .addTextArea((text) => {
+        text
+          .setPlaceholder("PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin\nCODEX_HOME=/Users/flytothesky/.codex")
+          .setValue(this.plugin.settings.codexEnvironmentVariables)
+          .onChange(async (value) => {
+            this.plugin.settings.codexEnvironmentVariables = value;
+            await this.plugin.saveSettings();
+          });
+        text.inputEl.rows = 4;
+        text.inputEl.style.width = "100%";
+      });
 
     new Setting(containerEl)
       .setName("Codex CLI timeout")
