@@ -1,5 +1,6 @@
 export type CodexPanelAction =
   | "study-note"
+  | "obsidian-canvas"
   | "context-map"
   | "revise-active"
   | "svg-sketch";
@@ -47,12 +48,20 @@ export const CODEX_PROMPT_PRESETS: CodexPromptPreset[] = [
     instruction:
       "누락된 의사결정 핵심 근거를 보강하라. 숫자, 비교 기준, 조건부 판단, 다음 주 확인 질문을 균형 있게 남겨라.",
   },
+  {
+    id: "canvas-video",
+    label: "영상식 Canvas",
+    instruction:
+      "Obsidian Canvas의 장점을 살려라. 원문 파일 노드는 열어볼 수 있게 유지하고, 개념 노드와 근거 노드를 연결해 AI가 나중에 다시 재배치·수정하기 쉬운 JSON Canvas로 구성하라.",
+  },
 ];
 
 export function actionLabel(action: CodexPanelAction): string {
   switch (action) {
     case "study-note":
       return "노트 한눈필기";
+    case "obsidian-canvas":
+      return "Obsidian Canvas";
     case "context-map":
       return "맥락 다이어그램";
     case "revise-active":

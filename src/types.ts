@@ -109,3 +109,55 @@ export interface ExcalidrawArrowElement extends ExcalidrawBaseElement {
   lastCommittedPoint: null;
   elbowed: false;
 }
+
+export interface CanvasBuildResult {
+  json: string;
+  canvas: JsonCanvas;
+  nodeCount: number;
+  edgeCount: number;
+}
+
+export interface JsonCanvas {
+  nodes: JsonCanvasNode[];
+  edges: JsonCanvasEdge[];
+}
+
+export type JsonCanvasNode = JsonCanvasTextNode | JsonCanvasFileNode | JsonCanvasGroupNode;
+
+export interface JsonCanvasBaseNode {
+  id: string;
+  type: "text" | "file" | "group";
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  color?: string;
+}
+
+export interface JsonCanvasTextNode extends JsonCanvasBaseNode {
+  type: "text";
+  text: string;
+}
+
+export interface JsonCanvasFileNode extends JsonCanvasBaseNode {
+  type: "file";
+  file: string;
+  subpath?: string;
+}
+
+export interface JsonCanvasGroupNode extends JsonCanvasBaseNode {
+  type: "group";
+  label?: string;
+}
+
+export interface JsonCanvasEdge {
+  id: string;
+  fromNode: string;
+  fromSide?: "top" | "right" | "bottom" | "left";
+  fromEnd?: "none" | "arrow";
+  toNode: string;
+  toSide?: "top" | "right" | "bottom" | "left";
+  toEnd?: "none" | "arrow";
+  color?: string;
+  label?: string;
+}

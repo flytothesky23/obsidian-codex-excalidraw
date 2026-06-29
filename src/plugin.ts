@@ -10,6 +10,8 @@ import {
   TFolder,
   WorkspaceLeaf,
 } from "obsidian";
+import { buildCanvas } from "./canvas";
+import { buildCanvasBrief } from "./canvas-brief";
 import { buildCodexBrief } from "./codex-brief";
 import { runCodexExec } from "./codex-cli";
 import { buildDiagram, defaultDiagramOptions } from "./diagram";
@@ -74,6 +76,28 @@ export default class CodexExcalidrawPlugin extends Plugin {
         const active = this.app.workspace.getActiveFile();
         if (!active) return false;
         if (!checking) void this.createFromCurrentNote(true);
+        return true;
+      },
+    });
+
+    this.addCommand({
+      id: "create-canvas-from-current-note",
+      name: "Create Obsidian Canvas from current note",
+      checkCallback: (checking) => {
+        const active = this.app.workspace.getActiveFile();
+        if (!active) return false;
+        if (!checking) void this.createCanvasFromCurrentNote();
+        return true;
+      },
+    });
+
+    this.addCommand({
+      id: "create-canvas-from-current-note-with-codex-cli",
+      name: "Create Obsidian Canvas from current note with Codex CLI",
+      checkCallback: (checking) => {
+        const active = this.app.workspace.getActiveFile();
+        if (!active) return false;
+        if (!checking) void this.createCanvasFromCurrentNote(true);
         return true;
       },
     });
@@ -169,10 +193,38 @@ export default class CodexExcalidrawPlugin extends Plugin {
     await this.copyCodexBrief(active);
   }
 
+  async createCanvasFromCurrentNote(runCodex = false, instruction = ""): Promise<void> {
+    const active = this.app.workspace.getActiveFile();
+    if (!active) {
+      new Notice("Open a Markdown note first.");
+      return;
+    }
+    if (isExcalidrawDrawing(active) || isCanvasFile(active)) {
+      new Notice("Open a source Markdown note before creating a new Canvas.");
+      return;
+    }
+
+    const files = await this.expandLinkedNotes(active);
+    await this.createCanvasFromFiles(files, active.basename, runCodex, instruction);
+  }
+
   async runCodexPanelAction(action: CodexPanelAction, instruction: string): Promise<string> {
     const active = this.app.workspace.getActiveFile();
     if (!active) {
       throw new Error("Open a Markdown note or Excalidraw drawing first.");
+    }
+
+    if (action === "obsidian-canvas") {
+      if (isCanvasFile(active)) {
+        const summary = await this.reviseActiveCanvasWithCodex(active.path, instruction);
+        return summary || `Updated ${active.path}`;
+      }
+      if (isExcalidrawDrawing(active)) {
+        throw new Error("Open a source Markdown note or an existing .canvas file for Obsidian Canvas work.");
+      }
+      const files = await this.expandLinkedNotes(active);
+      const path = await this.createCanvasFromFiles(files, active.basename, true, instruction);
+      return `Created ${path}`;
     }
 
     if (action === "revise-active") {
@@ -223,6 +275,37 @@ export default class CodexExcalidrawPlugin extends Plugin {
       return;
     }
     await this.createFromFiles(files, folder.path || "Vault", runCodex);
+  }
+
+  private async createCanvasFromFiles(
+    files: TFile[],
+    label: string,
+    runCodex = false,
+    instruction = "",
+  ): Promise<string> {
+    const capped = files.slice(0, this.settings.maxNotesPerDiagram);
+    const contexts = await this.readNoteContexts(capped, !runCodex);
+    const title = `${label} Obsidian Canvas`;
+    const result = buildCanvas(contexts, title);
+    const path = await this.writeCanvas(result.json, label);
+    new Notice(`Created ${path} with ${result.nodeCount} canvas nodes and ${result.edgeCount} edges.`, 7000);
+
+    if (runCodex) {
+      try {
+        await this.refineCanvasWithCodex(contexts, path, instruction);
+      } catch (error) {
+        this.notifyCodexError(error);
+      }
+    }
+
+    if (this.settings.openAfterCreate) {
+      const created = this.app.vault.getAbstractFileByPath(path);
+      if (created instanceof TFile) {
+        await this.app.workspace.getLeaf("tab").openFile(created);
+      }
+    }
+
+    return path;
   }
 
   private async createFromFiles(files: TFile[], label: string, runCodex = false): Promise<void> {
@@ -374,6 +457,87 @@ export default class CodexExcalidrawPlugin extends Plugin {
     return summary;
   }
 
+  private async refineCanvasWithCodex(
+    contexts: NoteContext[],
+    targetPath: string,
+    instruction = "",
+  ): Promise<string> {
+    const adapter = this.app.vault.adapter;
+    if (!(adapter instanceof FileSystemAdapter)) {
+      throw new Error("Codex CLI Canvas refinement requires the desktop filesystem adapter.");
+    }
+
+    const prompt = [
+      buildCanvasBrief(contexts, targetPath),
+      "",
+      "# User Instruction",
+      "",
+      instruction.trim() || "영상의 Obsidian Canvas 방식처럼 원문 파일 노드와 개념 노드를 연결하고, 흩어진 생각을 읽기 쉬운 구조로 자동 정렬해줘.",
+      "",
+      "# Execution",
+      "",
+      "Read the source Markdown files and target canvas from disk first.",
+      `Edit only this target canvas file: ${targetPath}`,
+      "Keep it as valid Obsidian JSON Canvas. Do not generate Excalidraw Markdown for this action.",
+    ].join("\n");
+
+    new Notice("Codex CLI is composing an Obsidian Canvas JSON file...");
+    const result = await runCodexExec({
+      command: this.settings.codexCommand,
+      cwd: adapter.getBasePath(),
+      prompt,
+      model: this.settings.codexModel,
+      reasoningEffort: this.settings.codexReasoningEffort,
+      timeoutMs: this.settings.codexTimeoutSeconds * 1000,
+    });
+    const summary = summarizeCodexResult(result.stdout || result.stderr);
+    new Notice(`Codex CLI finished. ${summary || "Canvas refined."}`, 10000);
+    return summary;
+  }
+
+  private async reviseActiveCanvasWithCodex(targetPath: string, instruction: string): Promise<string> {
+    const adapter = this.app.vault.adapter;
+    if (!(adapter instanceof FileSystemAdapter)) {
+      throw new Error("Codex CLI Canvas revision requires the desktop filesystem adapter.");
+    }
+
+    const prompt = [
+      "# Obsidian Canvas Revision",
+      "",
+      "You are revising an existing Obsidian `.canvas` JSON file from inside the vault root.",
+      `Target canvas: ${targetPath}`,
+      "",
+      "# User Instruction",
+      "",
+      instruction.trim() || "Rearrange, recolor, and clarify the existing Canvas while preserving useful user nodes.",
+      "",
+      "# Execution",
+      "",
+      "Read the target canvas file first.",
+      "Read any `file` node Markdown paths that are relevant before revising.",
+      "Edit only the target `.canvas` file.",
+      "Keep valid JSON Canvas with top-level `nodes` and `edges` arrays.",
+      "Every node and edge id must be unique 16-character lowercase hex.",
+      "Every edge must reference existing nodes.",
+      "Use Obsidian Canvas strengths: file nodes, concept text nodes, groups, colors, and readable auto-layout.",
+      "Do not create SVG, HTML, PNG, or Excalidraw Markdown for this action.",
+      "After editing, report the structure changes.",
+    ].join("\n");
+
+    new Notice("Codex CLI is revising the active Obsidian Canvas...");
+    const result = await runCodexExec({
+      command: this.settings.codexCommand,
+      cwd: adapter.getBasePath(),
+      prompt,
+      model: this.settings.codexModel,
+      reasoningEffort: this.settings.codexReasoningEffort,
+      timeoutMs: this.settings.codexTimeoutSeconds * 1000,
+    });
+    const summary = summarizeCodexResult(result.stdout || result.stderr);
+    new Notice(`Codex CLI finished. ${summary || "Canvas revised."}`, 10000);
+    return summary;
+  }
+
   private codexBriefOptions() {
     return {
       visualTheme: this.settings.visualTheme,
@@ -458,6 +622,13 @@ export default class CodexExcalidrawPlugin extends Plugin {
     return path;
   }
 
+  private async writeCanvas(json: string, label: string): Promise<string> {
+    const path = await this.nextCanvasPath(label);
+    await this.ensureFolder(this.settings.outputFolder);
+    await this.app.vault.create(path, json);
+    return path;
+  }
+
   private async nextDrawingPath(label: string): Promise<string> {
     const folder = normalizePath(this.settings.outputFolder);
     const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "");
@@ -466,6 +637,19 @@ export default class CodexExcalidrawPlugin extends Plugin {
     let counter = 2;
     while (this.app.vault.getAbstractFileByPath(path)) {
       path = normalizePath(`${folder}/${cleanLabel} ${stamp} ${counter}.excalidraw.md`);
+      counter += 1;
+    }
+    return path;
+  }
+
+  private async nextCanvasPath(label: string): Promise<string> {
+    const folder = normalizePath(this.settings.outputFolder);
+    const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "");
+    const cleanLabel = sanitizeFileName(label || "Codex Canvas");
+    let path = normalizePath(`${folder}/${cleanLabel} ${stamp}.canvas`);
+    let counter = 2;
+    while (this.app.vault.getAbstractFileByPath(path)) {
+      path = normalizePath(`${folder}/${cleanLabel} ${stamp} ${counter}.canvas`);
       counter += 1;
     }
     return path;
@@ -530,10 +714,16 @@ function isExcalidrawDrawing(file: TFile): boolean {
   return file.path.endsWith(".excalidraw.md");
 }
 
+function isCanvasFile(file: TFile): boolean {
+  return file.path.endsWith(".canvas");
+}
+
 function panelActionPrompt(action: CodexPanelAction): string {
   switch (action) {
     case "study-note":
       return "Create a one-screen Korean handwritten study note that improves understanding more than the original Markdown.";
+    case "obsidian-canvas":
+      return "Create or revise an Obsidian JSON Canvas: arrange file nodes, concept nodes, groups, colors, and edges so Claude/Codex can keep editing the plain JSON.";
     case "context-map":
       return "Create a semantic context diagram: synthesize claims, causes, evidence, tensions, and follow-up questions across the source notes.";
     case "svg-sketch":
@@ -621,6 +811,9 @@ class CodexExcalidrawPanelView extends ItemView {
     });
     this.addButton(actions, "Codex 한눈필기", () => {
       void this.runPanelAction("study-note");
+    });
+    this.addButton(actions, "Obsidian Canvas", () => {
+      void this.runPanelAction("obsidian-canvas");
     });
     this.addButton(actions, "Codex 맥락도", () => {
       void this.runPanelAction("context-map");
