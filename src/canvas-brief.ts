@@ -48,7 +48,7 @@ export function buildCanvasBrief(notes: NoteContext[], targetPath: string): stri
     "# Thinking Standard",
     "",
     "- Do not make a decorative diagram. Make a working thinking canvas.",
-    "- If the source is a business or research note, extract the main question, current judgment, evidence spine, uncertainty, and next action.",
+    "- Extract the source note's main question, current judgment, evidence spine, uncertainty, and next action according to the note's own domain.",
     "- If there are multiple notes, synthesize the shared model and connect source file nodes to the concept nodes they support.",
     "- If the current canvas is a rough sketch, keep useful user nodes and expand them into a coherent structure.",
     "- If nodes are scattered, auto-layout them into clear lanes or clusters.",

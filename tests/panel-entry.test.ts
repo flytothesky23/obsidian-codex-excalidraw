@@ -62,6 +62,9 @@ describe("Codex drawing panel entry points", () => {
 
   it("lays out panel toolbar buttons as compact single-line controls", () => {
     expect(stylesSource).toContain("grid-template-columns: repeat(3, minmax(0, 1fr))");
+    expect(stylesSource).toContain("grid-template-columns: minmax(0, 1fr) 36px");
+    expect(stylesSource).toContain("overflow-y: auto");
+    expect(stylesSource).toContain("padding: 16px 14px 56px");
     expect(stylesSource).toContain("flex-wrap: nowrap");
     expect(stylesSource).toContain("white-space: nowrap");
     expect(stylesSource).toContain("word-break: keep-all");
@@ -113,7 +116,11 @@ describe("Codex drawing panel entry points", () => {
   it("protects Markdown source notes by routing rewrite requests to a copy", () => {
     expect(pluginSource).toContain("Never modify a Markdown source note in place");
     expect(pluginSource).toContain("createMarkdownRevisionCopy");
+    expect(pluginSource).toContain("MARKDOWN_REVISION_INBOX_FOLDER");
+    expect(pluginSource).toContain("00_수집함");
     expect(pluginSource).toContain("shouldCreateMarkdownRevisionCopy");
+    expect(pluginSource).toContain("resolveMarkdownRevisionSource");
+    expect(pluginSource).toContain("extractMarkdownPathCandidates");
     expect(pluginSource).toContain("_수정");
     expect(pluginSource).toContain("원본 노트는 수정하지 않았습니다");
     expect(pluginSource).toContain("수정 사본:");

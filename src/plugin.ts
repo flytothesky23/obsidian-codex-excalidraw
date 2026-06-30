@@ -33,6 +33,7 @@ import { CodexExcalidrawSettingTab, DEFAULT_SETTINGS, type CodexExcalidrawSettin
 import type { NoteContext, NoteLink } from "./types";
 
 const CODEX_EXCALIDRAW_PANEL_VIEW = "codex-excalidraw-panel";
+const MARKDOWN_REVISION_INBOX_FOLDER = "00_수집함";
 
 export default class CodexExcalidrawPlugin extends Plugin {
   settings: CodexExcalidrawSettings = DEFAULT_SETTINGS;
@@ -316,11 +317,15 @@ export default class CodexExcalidrawPlugin extends Plugin {
     }
 
     const active = this.app.workspace.getActiveFile();
-    const markdownRevisionCopy = active instanceof TFile && isPlainMarkdownNote(active) && shouldCreateMarkdownRevisionCopy(trimmedInstruction)
-      ? await this.createMarkdownRevisionCopy(active)
+    const markdownRevisionSource = shouldCreateMarkdownRevisionCopy(trimmedInstruction)
+      ? this.resolveMarkdownRevisionSource(trimmedInstruction, active instanceof TFile ? active : null, adapter)
       : null;
-    const activeContent = active instanceof TFile
-      ? truncate(await this.app.vault.cachedRead(active), this.settings.maxCharactersPerNote)
+    const markdownRevisionCopy = markdownRevisionSource
+      ? await this.createMarkdownRevisionCopy(markdownRevisionSource)
+      : null;
+    const contextFile = markdownRevisionSource ?? (active instanceof TFile ? active : null);
+    const activeContent = contextFile instanceof TFile
+      ? truncate(await this.app.vault.cachedRead(contextFile), this.settings.maxCharactersPerNote)
       : "";
     const prompt = [
       "# Codex Drawing Side Panel Chat",
@@ -332,14 +337,14 @@ export default class CodexExcalidrawPlugin extends Plugin {
       markdownRevisionCopy
         ? `A safe Markdown copy has already been created for this request. If the user is asking to rewrite or reorganize Markdown, edit only this copy: ${markdownRevisionCopy.path}`
         : "If the user asks to rewrite or reorganize Markdown and no safe copy target is listed, answer with the proposed structure instead of editing the source note.",
-      active && markdownRevisionCopy ? `Original Markdown note is read-only for this request: ${active.path}` : "",
+      markdownRevisionSource && markdownRevisionCopy ? `Original Markdown note is read-only for this request: ${markdownRevisionSource.path}` : "",
       "If the user explicitly asks to edit the current drawing, Canvas, or SVG/Excalidraw target, edit only that visual target file unless they name another file.",
       "If the user is asking a question, answer directly and do not modify files.",
       "When creating or revising visual notes, prefer readable teacher-board structure: question, provisional conclusion, evidence, tension, caveat, next check.",
       "",
       "# Active File",
       "",
-      active ? active.path : "No active file.",
+      contextFile ? contextFile.path : "No active file.",
       "",
       "# Active File Content",
       "",
@@ -369,7 +374,7 @@ export default class CodexExcalidrawPlugin extends Plugin {
       return [
         finalText,
         "",
-        `원본 노트는 수정하지 않았습니다: ${active?.path ?? "unknown"}`,
+        `원본 노트는 수정하지 않았습니다: ${markdownRevisionSource?.path ?? "unknown"}`,
         `수정 사본: ${markdownRevisionCopy.path}`,
       ].join("\n");
     }
@@ -524,7 +529,8 @@ export default class CodexExcalidrawPlugin extends Plugin {
 
   private async createMarkdownRevisionCopy(source: TFile): Promise<TFile> {
     const content = await this.app.vault.cachedRead(source);
-    const path = await this.nextMarkdownSiblingPath(source, `${source.basename}_수정`);
+    await this.ensureFolder(MARKDOWN_REVISION_INBOX_FOLDER);
+    const path = await this.nextMarkdownRevisionPath(`${source.basename}_수정`);
     const created = await this.app.vault.create(path, content);
     if (!(created instanceof TFile)) {
       throw new Error(`Failed to create Markdown revision copy: ${path}`);
@@ -533,15 +539,47 @@ export default class CodexExcalidrawPlugin extends Plugin {
     return created;
   }
 
-  private async nextMarkdownSiblingPath(source: TFile, basename: string): Promise<string> {
-    const folder = source.parent?.path ?? "";
+  private async nextMarkdownRevisionPath(basename: string): Promise<string> {
+    const folder = MARKDOWN_REVISION_INBOX_FOLDER;
     let counter = 1;
-    let path = normalizePath(folder ? `${folder}/${basename}.md` : `${basename}.md`);
+    let path = normalizePath(`${folder}/${basename}.md`);
     while (this.app.vault.getAbstractFileByPath(path)) {
       counter += 1;
-      path = normalizePath(folder ? `${folder}/${basename} ${counter}.md` : `${basename} ${counter}.md`);
+      path = normalizePath(`${folder}/${basename} ${counter}.md`);
     }
     return path;
+  }
+
+  private resolveMarkdownRevisionSource(
+    instruction: string,
+    active: TFile | null,
+    adapter: FileSystemAdapter,
+  ): TFile | null {
+    const basePath = normalizePath(adapter.getBasePath());
+    for (const candidate of extractMarkdownPathCandidates(instruction)) {
+      const vaultPath = toVaultRelativeMarkdownPath(candidate, basePath);
+      const file = vaultPath
+        ? this.app.vault.getAbstractFileByPath(vaultPath)
+        : this.findMarkdownFileByAbsolutePath(candidate, adapter);
+      if (file instanceof TFile && isPlainMarkdownNote(file)) {
+        return file;
+      }
+    }
+    return active && isPlainMarkdownNote(active) ? active : null;
+  }
+
+  private findMarkdownFileByAbsolutePath(candidate: string, adapter: FileSystemAdapter): TFile | null {
+    const normalizedCandidate = normalizePath(decodePathCandidate(candidate));
+    if (!normalizedCandidate.startsWith("/")) return null;
+    const comparableCandidate = normalizedCandidate.normalize("NFC");
+    for (const file of this.app.vault.getMarkdownFiles()) {
+      if (!isPlainMarkdownNote(file)) continue;
+      const fullPath = normalizePath(adapter.getFullPath(file.path));
+      if (fullPath === normalizedCandidate || fullPath.normalize("NFC") === comparableCandidate) {
+        return file;
+      }
+    }
+    return null;
   }
 
   private async refineWithCodex(
@@ -992,6 +1030,46 @@ function shouldCreateMarkdownRevisionCopy(instruction: string): boolean {
     .test(normalized);
   const directRewrite = /(재구성하라|다시 구성하라|구조로.*구성|구조로.*정리|수정해|고쳐줘|바꿔줘|보강해)/.test(normalized);
   return (mentionsSourceText && rewriteIntent) || directRewrite;
+}
+
+function extractMarkdownPathCandidates(instruction: string): string[] {
+  const candidates = new Set<string>();
+  for (const match of instruction.matchAll(/(?:\/|[A-Za-z]:\\)[^\r\n`"'<>\]]+?\.md/g)) {
+    candidates.add(match[0].trim());
+  }
+  for (const rawLine of instruction.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    const end = line.indexOf(".md");
+    if (end < 0) continue;
+    const candidate = line.slice(0, end + 3).replace(/^[-*\s`"'<(]+/, "").trim();
+    if (candidate.includes("/") || candidate.includes("\\")) {
+      candidates.add(candidate);
+    }
+  }
+  return [...candidates];
+}
+
+function toVaultRelativeMarkdownPath(candidate: string, basePath: string): string | null {
+  const decoded = decodePathCandidate(candidate);
+  const normalized = normalizePath(decoded);
+  if (!normalized.endsWith(".md")) return null;
+  if (normalized.startsWith(`${basePath}/`)) {
+    return normalizePath(normalized.slice(basePath.length + 1));
+  }
+  if (normalized.startsWith("/") || /^[A-Za-z]:\//.test(normalized)) {
+    return null;
+  }
+  return normalized;
+}
+
+function decodePathCandidate(candidate: string): string {
+  let decoded = candidate.trim().replace(/^["'`<]+|["'`>]+$/g, "");
+  try {
+    decoded = decodeURIComponent(decoded);
+  } catch {
+    // Keep the original candidate when it is not URL encoded.
+  }
+  return decoded;
 }
 
 function formatActionOutput(summary: string, path: string): string {

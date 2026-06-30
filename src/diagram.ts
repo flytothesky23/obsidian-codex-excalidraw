@@ -15,27 +15,6 @@ const PALETTE = {
   line: "#94a3b8",
   paper: "#ffffff",
   panel: "#f8fafc",
-  panel2: "#f1f5f9",
-  blue: "#1d4ed8",
-  blueSoft: "#eff6ff",
-  teal: "#0f766e",
-  tealSoft: "#f0fdfa",
-  amber: "#92400e",
-  amberSoft: "#fffbeb",
-  red: "#991b1b",
-  redSoft: "#fef2f2",
-};
-
-const CHALK = {
-  board: "#123b34",
-  boardSoft: "#17463e",
-  chalk: "#f8fafc",
-  muted: "#d9eadf",
-  blue: "#a5d8ff",
-  yellow: "#ffe08a",
-  green: "#b2f2bb",
-  red: "#ffc9c9",
-  line: "#d9eadf",
 };
 
 const STUDY_THEMES = {
@@ -73,13 +52,26 @@ const STUDY_THEMES = {
   line: string;
 }>;
 
+type StudyTheme = (typeof STUDY_THEMES)[DiagramOptions["visualTheme"]];
 type Anchor = { x: number; y: number; width: number; height: number };
+
+interface GenericNoteAnalysis {
+  title: string;
+  question: string;
+  thesis: string;
+  structure: string[];
+  evidence: string[];
+  uncertainty: string[];
+  process: string[];
+  nextChecks: string[];
+  sourceGuard: string[];
+}
 
 export function buildDiagram(notes: NoteContext[], options: DiagramOptions): DiagramBuildResult {
   const sortedNotes = [...notes].sort((a, b) => a.path.localeCompare(b.path));
   const result =
     sortedNotes.length === 1
-      ? buildSingleNoteReportDiagram(sortedNotes[0], options)
+      ? buildSingleNoteStudyDiagram(sortedNotes[0], options)
       : buildMultiNoteContextDiagram(sortedNotes, options);
 
   return {
@@ -111,11 +103,11 @@ export function defaultDiagramOptions(
   };
 }
 
-function buildSingleNoteReportDiagram(
+function buildSingleNoteStudyDiagram(
   note: NoteContext,
   options: DiagramOptions,
 ): Omit<DiagramBuildResult, "markdown"> {
-  const analysis = analyzeReportNote(note);
+  const analysis = analyzeGenericNote(note);
   const elements: ExcalidrawElement[] = [];
   const theme = STUDY_THEMES[options.visualTheme];
   const fontFamily = options.handwritingFontFamily;
@@ -129,8 +121,8 @@ function buildSingleNoteReportDiagram(
     width: 2140,
     height: 230,
     color: theme.ink,
-    title: chalkTitle(analysis.title, options.sourceLabel),
-    body: mainQuestion(analysis),
+    title: chalkLines(analysis.title, 30, 1),
+    body: chalkLines(`질문: ${analysis.question}`, 46, 2),
     titleSize: 56,
     bodySize: 38,
   });
@@ -138,14 +130,14 @@ function buildSingleNoteReportDiagram(
   addChalkPanel(elements, {
     theme,
     fontFamily,
-    id: "judgement",
+    id: "thesis",
     x: 390,
     y: 340,
     width: 1360,
     height: 280,
     color: theme.green,
     title: "잠정 결론",
-    body: chalkLines(judgementSignal(analysis), 60, 3),
+    body: chalkLines(analysis.thesis, 60, 3),
     titleSize: 40,
     bodySize: 31,
   });
@@ -153,14 +145,14 @@ function buildSingleNoteReportDiagram(
   addChalkPanel(elements, {
     theme,
     fontFamily,
-    id: "sales",
+    id: "structure",
     x: 0,
     y: 760,
     width: 650,
     height: 340,
     color: theme.blue,
-    title: "1. 판매/수요",
-    body: chalkLines(salesSignal(analysis), 42, 4),
+    title: "1. 핵심 구조",
+    body: chalkBulletLines(analysis.structure, 40, 4),
     titleSize: 37,
     bodySize: 28,
   });
@@ -168,14 +160,14 @@ function buildSingleNoteReportDiagram(
   addChalkPanel(elements, {
     theme,
     fontFamily,
-    id: "price",
+    id: "evidence",
     x: 745,
     y: 760,
     width: 650,
     height: 340,
     color: theme.yellow,
-    title: "2. 가격/운임",
-    body: chalkLines(priceSignal(analysis), 42, 4),
+    title: "2. 근거 / 자료",
+    body: chalkBulletLines(analysis.evidence, 40, 4),
     titleSize: 37,
     bodySize: 28,
   });
@@ -183,14 +175,14 @@ function buildSingleNoteReportDiagram(
   addChalkPanel(elements, {
     theme,
     fontFamily,
-    id: "ops",
+    id: "uncertainty",
     x: 1490,
     y: 760,
     width: 650,
     height: 340,
-    color: theme.muted,
-    title: "3. 운영 회복",
-    body: chalkLines(opsSignal(analysis), 42, 4),
+    color: theme.red,
+    title: "3. 아직 조심할 점",
+    body: chalkBulletLines(analysis.uncertainty, 40, 4),
     titleSize: 37,
     bodySize: 28,
   });
@@ -198,29 +190,14 @@ function buildSingleNoteReportDiagram(
   addChalkPanel(elements, {
     theme,
     fontFamily,
-    id: "mix",
+    id: "process",
     x: 0,
     y: 1210,
     width: 670,
     height: 300,
-    color: theme.ink,
-    title: "4. 용도/고객 믹스",
-    body: chalkLines(mixSignal(analysis), 43, 3),
-    titleSize: 35,
-    bodySize: 26,
-  });
-
-  addChalkPanel(elements, {
-    theme,
-    fontFamily,
-    id: "counter",
-    x: 735,
-    y: 1210,
-    width: 670,
-    height: 300,
-    color: theme.red,
-    title: "5. 단정하면 안 되는 이유",
-    body: chalkLines(counterSignal(analysis), 43, 3),
+    color: theme.muted,
+    title: "4. 실행 / 절차",
+    body: chalkBulletLines(analysis.process, 42, 3),
     titleSize: 35,
     bodySize: 26,
   });
@@ -229,13 +206,13 @@ function buildSingleNoteReportDiagram(
     theme,
     fontFamily,
     id: "next",
-    x: 1470,
+    x: 735,
     y: 1210,
     width: 670,
     height: 300,
     color: theme.ink,
-    title: "다음에 확인할 것",
-    body: chalkLines(nextChecks(analysis), 43, 3),
+    title: "5. 다음에 확인할 것",
+    body: chalkBulletLines(analysis.nextChecks, 42, 3),
     titleSize: 35,
     bodySize: 26,
   });
@@ -243,24 +220,24 @@ function buildSingleNoteReportDiagram(
   addChalkPanel(elements, {
     theme,
     fontFamily,
-    id: "caveat",
-    x: 390,
-    y: 1610,
-    width: 1360,
-    height: 200,
-    color: theme.red,
-    title: "품질 게이트",
-    body: chalkLines(qualitySignal(analysis), 74, 2),
+    id: "source",
+    x: 1470,
+    y: 1210,
+    width: 670,
+    height: 300,
+    color: theme.ink,
+    title: "원문 보호 기준",
+    body: chalkBulletLines(analysis.sourceGuard, 42, 3),
     titleSize: 35,
     bodySize: 26,
   });
 
-  addChalkArrow(elements, "title-judge", { x: 1070, y: 230 }, { x: 1070, y: 340 }, theme.green);
-  addChalkArrow(elements, "judge-sales", { x: 1065, y: 620 }, { x: 325, y: 760 }, theme.blue);
-  addChalkArrow(elements, "judge-price", { x: 1070, y: 620 }, { x: 1070, y: 760 }, theme.yellow);
-  addChalkArrow(elements, "judge-ops", { x: 1075, y: 620 }, { x: 1815, y: 760 }, theme.muted);
-  addChalkArrow(elements, "price-counter", { x: 1070, y: 1100 }, { x: 1070, y: 1210 }, theme.red);
-  addChalkArrow(elements, "ops-next", { x: 1815, y: 1100 }, { x: 1805, y: 1210 }, theme.line);
+  addChalkArrow(elements, "title-thesis", { x: 1070, y: 230 }, { x: 1070, y: 340 }, theme.green);
+  addChalkArrow(elements, "thesis-structure", { x: 1065, y: 620 }, { x: 325, y: 760 }, theme.blue);
+  addChalkArrow(elements, "thesis-evidence", { x: 1070, y: 620 }, { x: 1070, y: 760 }, theme.yellow);
+  addChalkArrow(elements, "thesis-uncertainty", { x: 1075, y: 620 }, { x: 1815, y: 760 }, theme.red);
+  addChalkArrow(elements, "evidence-next", { x: 1070, y: 1100 }, { x: 1070, y: 1210 }, theme.ink);
+  addChalkArrow(elements, "uncertainty-source", { x: 1815, y: 1100 }, { x: 1805, y: 1210 }, theme.line);
 
   scaleStudyNoteElements(elements, options.studyNoteFontScale);
 
@@ -339,45 +316,134 @@ function buildMultiNoteContextDiagram(
   };
 }
 
-function analyzeReportNote(note: NoteContext) {
+function analyzeGenericNote(note: NoteContext): GenericNoteAnalysis {
   const content = note.content;
-  const title = firstHeading(content) ?? note.basename;
-  const period = extractPeriod(content);
-  const judgement = extractCallout(content, "summary") || extractBullets(section(content, "Executive Brief"), 4);
-  const warning = extractCallout(content, "warning").slice(0, 2);
-  const kpis = parseTable(section(content, "경영 지표 보드")).slice(0, 5);
-  const baseline = parseTable(section(content, "기준선 적용 상태")).slice(0, 3);
-  const operations = parseTable(section(content, "운영 자원 진단"))
-    .slice(0, 5)
-    .map((row) => `${row["사업장"]}: ${row["이번 주 해석"] || row["해석"]}`)
-    .filter(Boolean);
-  const qualityGates = parseTable(section(content, "수량·금액 확인 플래그"))
-    .slice(0, 4)
-    .map((row) => `${row["플래그"]}: ${row["W25 판정"]} - ${row["조치"]}`)
-    .filter(Boolean);
+  const title = cleanText(firstHeading(content) ?? note.basename);
+  const allLines = narrativeLines(content);
+  const headingLines = note.headings.map((heading) => cleanText(heading.heading)).filter(Boolean);
+  const tableLines = summarizeTables(content);
+
+  const question = extractFirstQuestion(allLines)
+    ?? `${truncate(title, 34)}에서 먼저 이해해야 할 핵심 질문은 무엇인가?`;
+  const thesis = firstUseful(
+    [
+      ...extractCallouts(content, ["summary", "abstract", "tldr", "info"]).slice(0, 2),
+      note.summary,
+      ...allLines.filter((line) => line.length >= 28).slice(0, 2),
+    ],
+    "원문의 목적, 판단 기준, 근거, 주의사항을 먼저 분리해 읽습니다.",
+    150,
+  );
+
+  const structure = uniqueNonEmpty([
+    ...headingLines.slice(0, 5),
+    ...allLines.filter((line) => includesAny(line, ["목적", "구성", "개요", "로드맵", "범위", "기능"])).slice(0, 3),
+    note.summary,
+  ]).slice(0, 5);
+
+  const evidence = uniqueNonEmpty([
+    ...tableLines.slice(0, 3),
+    ...linesByKeywords(allLines, [
+      "근거",
+      "자료",
+      "기준",
+      "요건",
+      "설정",
+      "명령",
+      "CLI",
+      "OAuth",
+      "파일",
+      "환경",
+      "지원",
+    ], 5),
+  ]).slice(0, 5);
+
+  const uncertainty = uniqueNonEmpty([
+    ...extractCallouts(content, ["warning", "caution", "danger", "important"]).slice(0, 3),
+    ...linesByKeywords(allLines, [
+      "주의",
+      "보안",
+      "권한",
+      "제약",
+      "한계",
+      "위험",
+      "문제",
+      "오류",
+      "실패",
+      "불확실",
+      "미정",
+    ], 5),
+  ]).slice(0, 5);
+
+  const process = uniqueNonEmpty([
+    ...linesByKeywords(allLines, [
+      "설치",
+      "사용",
+      "연동",
+      "실행",
+      "단계",
+      "절차",
+      "작업",
+      "로드맵",
+      "업데이트",
+      "배포",
+      "로그인",
+    ], 5),
+    ...headingLines.filter((line) => includesAny(line, ["설치", "사용", "연동", "절차", "로드맵", "단계"])),
+  ]).slice(0, 5);
+
+  const nextChecks = uniqueNonEmpty([
+    ...taskLines(content),
+    ...linesByKeywords(allLines, [
+      "확인",
+      "검증",
+      "다음",
+      "TODO",
+      "할 일",
+      "체크",
+      "테스트",
+      "보완",
+      "질문",
+    ], 5),
+    ...headingLines.filter((line) => includesAny(line, ["확인", "검증", "다음", "TODO", "체크"])),
+  ]).slice(0, 5);
 
   return {
     title,
-    period,
-    tags: note.tags.slice(0, 4),
-    judgement: judgement.length ? judgement : [note.summary],
-    warning,
-    kpis,
-    baseline,
-    salesMix: parseTable(section(content, "용도·규격·출고처")).slice(0, 5),
-    customers: parseTable(section(content, "고객별 전략 질문")).slice(0, 5),
-    yieldAudit: parseTable(section(content, "수율감사 요약")).slice(0, 2),
-    operations,
-    qualityGates: [...warning, ...qualityGates].slice(0, 5),
-    questions: deriveQuestions(content),
-    drivers: deriveDrivers(content, kpis, baseline),
+    question,
+    thesis,
+    structure: fillPanelItems(structure, [
+      "제목과 상위 섹션을 먼저 읽어 전체 범위를 잡습니다.",
+      "본문의 세부 항목은 목적과 사용 흐름 아래에 배치합니다.",
+    ]),
+    evidence: fillPanelItems(evidence, [
+      "표, 명령, 설정값, 링크는 판단을 지지하는 근거로 분리합니다.",
+      "숫자와 파일 경로는 원문에서 다시 확인합니다.",
+    ]),
+    uncertainty: fillPanelItems(uncertainty, [
+      "보안, 권한, 설치 조건, 예외 상황은 결론과 분리해 둡니다.",
+      "원문에 없는 판단은 추가하지 않습니다.",
+    ]),
+    process: fillPanelItems(process, [
+      "사용자는 설치 → 설정 → 실행 → 검증 순서로 따라가야 합니다.",
+      "실행 가능한 단계와 배경 설명을 구분합니다.",
+    ]),
+    nextChecks: fillPanelItems(nextChecks, [
+      "실제 환경에서 한 번 실행하고 실패 메시지를 확인합니다.",
+      "누락된 링크, 명령, 버전 조건을 보완합니다.",
+    ]),
+    sourceGuard: [
+      `원문: ${truncate(note.path, 52)}`,
+      "이 그림은 요약 필기입니다. 원문을 덮어쓰지 않습니다.",
+      "근거가 약한 항목은 다음 확인 목록으로 남깁니다.",
+    ],
   };
 }
 
 function addChalkPanel(
   elements: ExcalidrawElement[],
   params: {
-    theme: typeof STUDY_THEMES[DiagramOptions["visualTheme"]];
+    theme: StudyTheme;
     fontFamily: number;
     id: string;
     x: number;
@@ -475,135 +541,15 @@ function clampScale(value: number): number {
   return Math.min(1.5, Math.max(0.75, Math.round(value * 100) / 100));
 }
 
-function chalkTitle(title: string, sourceLabel: string): string {
-  const cleaned = cleanText(title || sourceLabel).replace(/\s*\([^)]*\)\s*/g, " ").trim();
-  const short = cleaned.includes("유네코") ? "W25 한눈 필기" : truncate(cleaned, 34);
-  return chalkLines(short, 24, 1);
-}
-
-function mainQuestion(analysis: ReturnType<typeof analyzeReportNote>): string {
-  const question = analysis.questions[0] || "이번 약세는 일시적 차이인가, 회복 지연 신호인가?";
-  return chalkLines(`질문: ${cleanText(question).replace(/[.。]$/, "?")}`, 38, 2);
-}
-
-function judgementSignal(analysis: ReturnType<typeof analyzeReportNote>): string {
-  const judgement = firstUseful(analysis.judgement, "아직 결론보다 확인이 중요한 주간입니다.");
-  const baseline = analysis.baseline.find((row) => row["기준선"]?.includes("직전 4주"))?.["해석"];
-  return [judgement, baseline ? `핵심 비교: ${baseline}` : ""]
-    .filter(Boolean)
-    .join(" ");
-}
-
-function salesSignal(analysis: ReturnType<typeof analyzeReportNote>): string {
-  const row = analysis.kpis.find((item) => includesAny(item["지표"], ["PSBall", "매출", "판매"]));
-  const volume = analysis.kpis.find((item) => includesAny(item["지표"], ["판매량", "수량"]));
-  const baseline = analysis.baseline.find((item) => item["기준선"] === "직전 4주 평균");
-  return [
-    rowSummary(row),
-    rowSummary(volume),
-    baseline?.["해석"] ? `4주 평균: ${baseline["해석"]}` : "",
-  ].filter(Boolean).join(" / ") || firstUseful(analysis.drivers, "매출·판매량이 기준선보다 약한지 먼저 확인합니다.");
-}
-
-function priceSignal(analysis: ReturnType<typeof analyzeReportNote>): string {
-  const row = analysis.kpis.find((item) => includesAny(item["지표"], ["운임", "가격", "단가"]));
-  const driver = analysis.drivers.find((item) => includesAny(item, ["운임", "가격", "단가", "도착"]));
-  const question = analysis.questions.find((item) => includesAny(item, ["운임", "단가", "가격", "도착"]));
-  return [
-    rowSummary(row),
-    driver,
-    question ? `확인: ${question}` : "",
-  ].filter(Boolean).join(" / ") || cleanText("운임이 나쁜 비용인지, 단가로 회수되는 거래인지 봅니다.");
-}
-
-function opsSignal(analysis: ReturnType<typeof analyzeReportNote>): string {
-  return analysis.operations.slice(0, 3).join(" / ")
-    || "현장 이동·장비 기록이 다음 주 회복 확인 지점입니다.";
-}
-
-function mixSignal(analysis: ReturnType<typeof analyzeReportNote>): string {
-  const mix = analysis.salesMix.slice(0, 3).map((row) => {
-    const use = row["용도"] ?? row[Object.keys(row)[0]];
-    const revenue = row["매출액"] ? `${row["매출액"]}` : "";
-    const note = row["해석"] ?? "";
-    return cleanText([use, revenue, note].filter(Boolean).join(": "));
-  });
-  const customer = analysis.customers.slice(0, 2).map((row) => {
-    const name = row["고객"] ?? row[Object.keys(row)[0]];
-    const question = row["이번 주 질문"] ?? "";
-    return cleanText(`${name}: ${question}`);
-  });
-  return [...mix, ...customer].slice(0, 4).join(" / ")
-    || "용도 믹스 -> 규격 믹스 -> 출고처 -> 반복 주문 순서로 읽습니다.";
-}
-
-function counterSignal(analysis: ReturnType<typeof analyzeReportNote>): string {
-  const gates = [...analysis.warning, ...analysis.qualityGates].map(cleanText).join(" ");
-  const questions = analysis.questions.map(cleanText).join(" ");
-  const yieldAudit = analysis.yieldAudit.map(rowSummary).join(" ");
-  const points = [
-    includesAny(gates, ["검증용", "official_report=false", "공식 마감"])
-      ? "공식 마감 전 검증용 자료라 결론은 조건부"
-      : "",
-    includesAny(gates, ["월마감", "원장", "대사"])
-      ? "월마감 전 매출·수량 포함: 원장 대사 필요"
-      : "",
-    includesAny(questions, ["운임", "단가", "가격"])
-      ? "운임 상승만으로 악화 단정 금지: 단가 회수 확인"
-      : "",
-    includesAny([gates, yieldAudit].join(" "), ["함안", "청남", "상계", "내부이동"])
-      ? "함안·청남 내부이동은 연결 기준 상계 필요"
-      : "",
-  ].filter(Boolean);
-  return points.slice(0, 3).join(" / ")
-    || "검증용 참고자료이므로 회계 마감·성과 평가는 원장 대사 후 판단합니다.";
-}
-
-function nextChecks(analysis: ReturnType<typeof analyzeReportNote>): string {
-  return analysis.questions
-    .slice(0, 4)
-    .map((item) => truncate(cleanText(item).replace(/[.。]$/, ""), 46))
-    .join(" | ") || "원장 대사 | 고객 재주문 | 규격별 평균단가";
-}
-
-function qualitySignal(analysis: ReturnType<typeof analyzeReportNote>): string {
-  const gates = analysis.qualityGates.map(cleanText).join(" ");
-  const points = [
-    includesAny(gates, ["official_report=false", "공식 마감자료", "검증용"])
-      ? "검증용 경영참고자료: 공식 마감자료 아님"
-      : "",
-    includesAny(gates, ["월마감", "원장", "대사"])
-      ? "월마감 전 매출·수량은 원장 대사 후 확정"
-      : "",
-    includesAny(gates, ["함안", "청남", "수량 감사", "내부이동"])
-      ? "함안·청남 수량 감사와 내부이동 상계 확인"
-      : "",
-    includesAny(gates, ["High", "Medium"])
-      ? "차이 플래그는 위험도별로 다음 주 재확인"
-      : "",
-  ].filter(Boolean);
-  return points.slice(0, 3).join(" / ")
-    || "공식 마감자료가 아니며, 월마감 원장 대사 후 경영 판단에 사용합니다.";
-}
-
-function firstUseful(items: string[], fallback: string): string {
-  return truncate(cleanText(items.find((item) => cleanText(item).length > 0) ?? fallback), 96);
-}
-
-function rowSummary(row: Record<string, string> | undefined): string {
-  if (!row) return "";
-  const metric = row["지표"] ?? row["기준선"] ?? row[Object.keys(row)[0]];
-  const value = row["이번 주"] ?? row["전주 대비"] ?? row["판단 기준"] ?? "";
-  const judgement = row["판단"] ?? row["해석"] ?? row["이번 주 해석"] ?? "";
-  return truncate(cleanText([metric, value, judgement].filter(Boolean).join(" · ")), 96);
-}
-
-function includesAny(value: string | undefined, needles: string[]): boolean {
-  return Boolean(value && needles.some((needle) => value.includes(needle)));
-}
-
 function chalkLines(value: string, width: number, maxLines: number): string {
   return wrapText(cleanText(value), width).slice(0, maxLines).join("\n");
+}
+
+function chalkBulletLines(items: string[], width: number, maxLines: number): string {
+  const lines = items
+    .flatMap((item) => wrapText(`- ${cleanText(item)}`, width))
+    .slice(0, maxLines);
+  return lines.length ? lines.join("\n") : "- 원문에서 다시 확인";
 }
 
 function addPanel(
@@ -659,128 +605,6 @@ function addPanel(
   );
 }
 
-function addFlowStrip(elements: ExcalidrawElement[], analysis: ReturnType<typeof analyzeReportNote>): void {
-  const stages = [
-    ["원장/업무기록", analysis.baseline[0]?.["해석"] || "주간 원장과 현장 기록"],
-    ["KPI 변화", analysis.kpis[0]?.["판단"] || "매출·물량·운임 변화"],
-    ["드라이버 분해", "용도, 규격, 출고처, 운영 사건"],
-    ["다음 판단", analysis.questions[0] || "W26 회복 신호 확인"],
-  ];
-  const y = 920;
-  stages.forEach(([title, body], index) => {
-    const x = 805 + (index % 2) * 375;
-    const rowY = y + Math.floor(index / 2) * 155;
-    addPanel(elements, {
-      id: `flow-${index}`,
-      x,
-      y: rowY,
-      width: 345,
-      height: 135,
-      strokeColor: index === stages.length - 1 ? PALETTE.teal : PALETTE.slate,
-      backgroundColor: index === stages.length - 1 ? PALETTE.tealSoft : PALETTE.panel,
-      title,
-      body: truncate(body, 92),
-      titleSize: 18,
-      bodySize: 14,
-    });
-    if (index > 0) {
-      elements.push(
-        arrow({
-          id: stableId("flow-arrow", `${index}`),
-          start: { x: index % 2 === 0 ? x + 172 : x - 30, y: rowY + 67 },
-          end: { x: index % 2 === 0 ? x + 375 : x, y: rowY + 67 },
-          strokeColor: PALETTE.line,
-          strokeWidth: 1,
-        }),
-      );
-    }
-  });
-}
-
-function connect(elements: ExcalidrawElement[], from: string, to: string): void {
-  const anchors: Record<string, Anchor> = {
-    header: { x: 0, y: 0, width: 1540, height: 145 },
-    judgement: { x: 0, y: 190, width: 500, height: 300 },
-    kpi: { x: 540, y: 190, width: 520, height: 300 },
-    questions: { x: 1100, y: 190, width: 440, height: 300 },
-    sales: { x: 0, y: 540, width: 500, height: 330 },
-    yield: { x: 540, y: 540, width: 520, height: 330 },
-    ops: { x: 1100, y: 540, width: 440, height: 330 },
-    quality: { x: 0, y: 920, width: 760, height: 300 },
-  };
-  const a = anchors[from];
-  const b = anchors[to];
-  if (!a || !b) return;
-  elements.push(
-    arrow({
-      id: stableId("connect", `${from}->${to}`),
-      start: { x: a.x + a.width / 2, y: a.y + a.height },
-      end: { x: b.x + b.width / 2, y: b.y },
-      strokeColor: PALETTE.line,
-      strokeWidth: 1,
-    }),
-  );
-}
-
-function formatKpiRows(rows: Record<string, string>[]): string {
-  if (!rows.length) return "KPI 표를 찾지 못했습니다.\n본문의 경영 지표 보드를 확인하세요.";
-  return rows
-    .map((row) => {
-      const metric = row["지표"] ?? row[Object.keys(row)[0]];
-      const value = row["이번 주"] ?? "";
-      const delta = row["전주 대비"] ? ` (${row["전주 대비"]})` : "";
-      const judgement = row["판단"] ? ` - ${row["판단"]}` : "";
-      return `• ${metric}: ${value}${delta}${judgement}`;
-    })
-    .map((line) => wrapText(line, 54).join("\n  "))
-    .join("\n");
-}
-
-function formatDrivers(drivers: string[]): string {
-  return drivers.map((driver) => wrapText(`• ${driver}`, 78).join("\n  ")).join("\n");
-}
-
-function formatSalesMix(rows: Record<string, string>[]): string {
-  if (!rows.length) {
-    return "용도·고객군 표를 찾지 못했습니다.\nPSBall 전략 섹션을 확인하세요.";
-  }
-  return rows
-    .map((row) => {
-      const use = row["용도"] ?? row["렌즈"] ?? row[Object.keys(row)[0]];
-      const revenue = row["매출액"] ? ` ${row["매출액"]}` : "";
-      const volume = row["수량"] ? ` / ${row["수량"]}` : "";
-      const note = row["해석"] ?? row["판정"] ?? "";
-      return `• ${use}:${revenue}${volume} - ${note}`;
-    })
-    .map((line) => wrapText(line, 58).join("\n  "))
-    .join("\n");
-}
-
-function formatYieldAudit(rows: Record<string, string>[]): string {
-  if (!rows.length) {
-    return "수율감사 요약표를 찾지 못했습니다.\n함안·청남 가치 회수 섹션을 확인하세요.";
-  }
-  return rows
-    .map((row) => {
-      const site = row["사업장"] ?? row[Object.keys(row)[0]];
-      const inbound = row["총입고량"] ? `입고 ${row["총입고량"]}` : "";
-      const byproduct = row["판매가능 부산물"] ? `부산물 ${row["판매가능 부산물"]}` : "";
-      const yieldRate = row["부산물 수율"] ? `수율 ${row["부산물 수율"]}` : "";
-      const judgement = row["판정"] ? `판정 ${row["판정"]}` : "";
-      return `• ${site}: ${[inbound, byproduct, yieldRate, judgement].filter(Boolean).join(" / ")}`;
-    })
-    .map((line) => wrapText(line, 58).join("\n  "))
-    .join("\n");
-}
-
-function formatBullets(items: string[], limit: number, width: number): string {
-  return items
-    .filter(Boolean)
-    .slice(0, limit)
-    .map((item) => wrapText(`• ${cleanText(item)}`, width).join("\n  "))
-    .join("\n");
-}
-
 function renderNoteCard(note: NoteContext, options: DiagramOptions): string {
   const lines: string[] = [];
   if (note.tags.length > 0) lines.push(note.tags.slice(0, options.maxTagsPerNote).join(" "));
@@ -790,13 +614,13 @@ function renderNoteCard(note: NoteContext, options: DiagramOptions): string {
   if (headings.length > 0) {
     lines.push("", "핵심 구조");
     for (const heading of headings) {
-      lines.push(`${"  ".repeat(Math.max(0, heading.level - 1))}• ${truncate(heading.heading, 58)}`);
+      lines.push(`${"  ".repeat(Math.max(0, heading.level - 1))}- ${truncate(heading.heading, 58)}`);
     }
   }
   const links = note.links.slice(0, options.maxLinksPerNote);
   if (links.length > 0) {
     lines.push("", "연결");
-    for (const link of links) lines.push(`• [[${truncate(link.resolvedPath?.replace(/\.md$/i, "") ?? link.target, 52)}]]`);
+    for (const link of links) lines.push(`- [[${truncate(link.resolvedPath?.replace(/\.md$/i, "") ?? link.target, 52)}]]`);
   }
   return lines.join("\n");
 }
@@ -841,30 +665,72 @@ function buildRelationArrows(notes: NoteContext[], anchors: Map<string, Anchor>)
   return arrows;
 }
 
-function deriveDrivers(content: string, kpis: Record<string, string>[], baseline: Record<string, string>[]): string[] {
-  const drivers = [
-    kpis.find((row) => row["지표"]?.includes("PSBall 매출액"))?.["판단"],
-    kpis.find((row) => row["지표"]?.includes("운임"))?.["판단"],
-    baseline.find((row) => row["기준선"]?.includes("직전 4주"))?.["해석"],
-    ...extractBullets(section(content, "PSBall 판매 전략 진단"), 2),
-    ...extractBullets(section(content, "드라이버 진단 한계와 추가 데이터"), 2),
-  ].filter(Boolean) as string[];
-  return drivers.length ? drivers.slice(0, 7) : ["본문의 KPI, 기준선, 운영 기록을 함께 읽어 다음 주 판단 질문으로 전환한다."];
+function fillPanelItems(items: string[], fallback: string[]): string[] {
+  return uniqueNonEmpty(items).length ? uniqueNonEmpty(items) : fallback;
 }
 
-function deriveQuestions(content: string): string[] {
-  const explicit = [
-    ...extractNumberedList(section(content, "W21~W25 기준선 비교")).slice(0, 3),
-    ...extractBullets(section(content, "도착 조건 가격 회수 확인"), 2),
-    ...extractBullets(section(content, "드라이버 진단 한계와 추가 데이터"), 2),
-  ];
-  const fallback = [
-    "W25 약세가 출하 시점 차이인지 반복 고객·규격 약화인지 구분한다.",
-    "도착도 거래에서 운임이 제품 단가로 회수됐는지 확인한다.",
-    "칠서·부산·청남·하동의 W26 선별/출하 회복 신호를 확인한다.",
-    "함안·청남 내부이동은 연결 기준에서 상계하고 월마감 원장과 대사한다.",
-  ];
-  return (explicit.length ? explicit : fallback).slice(0, 6);
+function firstUseful(items: string[], fallback: string, maxLength: number): string {
+  return truncate(cleanText(items.find((item) => cleanText(item).length > 0) ?? fallback), maxLength);
+}
+
+function uniqueNonEmpty(items: string[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const item of items.map((value) => truncate(cleanText(value), 120)).filter(Boolean)) {
+    const key = item.toLowerCase();
+    if (!seen.has(key)) {
+      seen.add(key);
+      result.push(item);
+    }
+  }
+  return result;
+}
+
+function narrativeLines(content: string): string[] {
+  return content
+    .replace(/^---\s*\n[\s\S]*?\n---\s*\n?/, "")
+    .replace(/```[\s\S]*?```/g, "")
+    .replace(/%%[\s\S]*?%%/g, "")
+    .split(/\r?\n/)
+    .map((line) =>
+      cleanText(line
+        .replace(/^#{1,6}\s+/, "")
+        .replace(/^>\s*\[![^\]]+]\s*/, "")
+        .replace(/^>\s?/, "")
+        .replace(/^\s*[-*+]\s+/, "")
+        .replace(/^\s*[-*+]\s+\[[ xX-]]\s+/, "")
+        .replace(/^\s*\d+\.\s+/, "")),
+    )
+    .filter((line) =>
+      line.length > 0 &&
+      !line.startsWith("|") &&
+      !/^:?-{3,}:?$/.test(line) &&
+      !/^!\S+\.(png|jpe?g|gif|webp|svg)$/i.test(line),
+    );
+}
+
+function extractFirstQuestion(lines: string[]): string | undefined {
+  const question = lines.find((line) => /[?？]$/.test(line) || line.includes("무엇") || line.includes("어떻게"));
+  return question ? truncate(cleanText(question).replace(/[.。]$/, "?"), 90) : undefined;
+}
+
+function linesByKeywords(lines: string[], keywords: string[], limit: number): string[] {
+  return lines
+    .filter((line) => includesAny(line, keywords))
+    .slice(0, limit);
+}
+
+function taskLines(content: string): string[] {
+  return content
+    .split(/\r?\n/)
+    .map((line) => line.match(/^\s*[-*+]\s+\[[ xX-]]\s+(.+)/)?.[1])
+    .filter((line): line is string => Boolean(line))
+    .map(cleanText)
+    .slice(0, 5);
+}
+
+function extractCallouts(content: string, types: string[]): string[] {
+  return types.flatMap((type) => extractCallout(content, type));
 }
 
 function extractCallout(content: string, type: string): string[] {
@@ -887,13 +753,29 @@ function extractCallout(content: string, type: string): string[] {
   return result;
 }
 
-function section(content: string, heading: string): string {
+function summarizeTables(content: string): string[] {
+  const tables = parseTables(content);
+  return tables
+    .flatMap((rows) => rows.slice(0, 2).map(summarizeRow))
+    .filter(Boolean)
+    .slice(0, 5);
+}
+
+function parseTables(content: string): Record<string, string>[][] {
   const lines = content.split(/\r?\n/);
-  const start = lines.findIndex((line) => line.match(/^#{1,6}\s+/) && line.includes(heading));
-  if (start < 0) return "";
-  const level = lines[start].match(/^(#{1,6})\s+/)?.[1].length ?? 1;
-  const end = lines.findIndex((line, index) => index > start && line.match(new RegExp(`^#{1,${level}}\\s+`)));
-  return lines.slice(start + 1, end < 0 ? undefined : end).join("\n");
+  const tables: Record<string, string>[][] = [];
+  let index = 0;
+  while (index < lines.length) {
+    if (!lines[index].trim().startsWith("|")) {
+      index += 1;
+      continue;
+    }
+    const start = index;
+    while (index < lines.length && lines[index].trim().startsWith("|")) index += 1;
+    const parsed = parseTable(lines.slice(start, index).join("\n"));
+    if (parsed.length) tables.push(parsed);
+  }
+  return tables;
 }
 
 function parseTable(text: string): Record<string, string>[] {
@@ -917,30 +799,16 @@ function splitTableRow(line: string): string[] {
     .map((cell) => cell.trim());
 }
 
-function extractBullets(text: string, limit = 5): string[] {
-  return text
-    .split(/\r?\n/)
-    .map((line) => line.match(/^\s*[-*+]\s+(.+)/)?.[1])
-    .filter((line): line is string => Boolean(line))
-    .map(cleanText)
-    .slice(0, limit);
-}
-
-function extractNumberedList(text: string): string[] {
-  return text
-    .split(/\r?\n/)
-    .map((line) => line.match(/^\s*\d+\.\s+(.+)/)?.[1])
-    .filter((line): line is string => Boolean(line))
-    .map(cleanText);
+function summarizeRow(row: Record<string, string>): string {
+  const entries = Object.entries(row)
+    .filter(([, value]) => value)
+    .slice(0, 3)
+    .map(([key, value]) => `${key}: ${value}`);
+  return truncate(entries.join(" / "), 120);
 }
 
 function firstHeading(content: string): string | undefined {
   return content.match(/^#\s+(.+)$/m)?.[1].trim();
-}
-
-function extractPeriod(content: string): string | undefined {
-  const title = firstHeading(content);
-  return title?.match(/\((\d{4}-\d{2}-\d{2}\s*~\s*\d{4}-\d{2}-\d{2})\)/)?.[1];
 }
 
 function cleanText(value: string): string {
@@ -954,20 +822,44 @@ function cleanText(value: string): string {
     .trim();
 }
 
+function includesAny(value: string | undefined, needles: string[]): boolean {
+  const source = value?.toLowerCase();
+  return Boolean(source && needles.some((needle) => source.includes(needle.toLowerCase())));
+}
+
 function wrapText(text: string, width: number): string[] {
   const words = text.split(/\s+/).filter(Boolean);
   const lines: string[] = [];
   let current = "";
   for (const word of words) {
-    if (!current) {
-      current = word;
-    } else if ([...current, ...word].length + 1 <= width) {
-      current += ` ${word}`;
-    } else {
-      lines.push(current);
-      current = word;
+    const chunks = chunkLongWord(word, width);
+    for (const chunk of chunks) {
+      if (!current) {
+        current = chunk;
+      } else if ([...current, ...chunk].length + 1 <= width) {
+        current += ` ${chunk}`;
+      } else {
+        lines.push(current);
+        current = chunk;
+      }
     }
   }
   if (current) lines.push(current);
   return lines.length ? lines : [""];
+}
+
+function chunkLongWord(word: string, width: number): string[] {
+  if ([...word].length <= width) return [word];
+  const chunks: string[] = [];
+  let current = "";
+  for (const char of word) {
+    if ([...current, char].length > width) {
+      chunks.push(current);
+      current = char;
+    } else {
+      current += char;
+    }
+  }
+  if (current) chunks.push(current);
+  return chunks;
 }

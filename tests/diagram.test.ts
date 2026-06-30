@@ -107,7 +107,7 @@ describe("diagram generation", () => {
     );
   });
 
-  it("extracts a richer one-screen study note from a weekly report", () => {
+  it("extracts a generic one-screen study note without fixed domain panels", () => {
     const content = [
       "# 2026-W25 유네코 경영분석 주간보고서",
       "",
@@ -176,15 +176,17 @@ describe("diagram generation", () => {
       .join("\n");
 
     expect(visibleText).toContain("잠정 결론");
-    expect(visibleText).toContain("판매/수요");
-    expect(visibleText).toContain("가격/운임");
-    expect(visibleText).toContain("운영 회복");
-    expect(visibleText).toContain("용도/고객 믹스");
-    expect(visibleText).toContain("단정하면 안 되는 이유");
-    expect(visibleText).toContain("품질 게이트");
+    expect(visibleText).toContain("핵심 구조");
+    expect(visibleText).toContain("근거 / 자료");
+    expect(visibleText).toContain("아직 조심할 점");
+    expect(visibleText).toContain("다음에 확인할 것");
+    expect(visibleText).toContain("원문 보호 기준");
     expect(visibleText).toContain("77,758,995원");
-    expect(visibleText).toContain("단가 회수");
-    expect(result.textElementCount).toBe(18);
+    expect(visibleText).not.toContain("판매/수요");
+    expect(visibleText).not.toContain("가격/운임");
+    expect(visibleText).not.toContain("운영 회복");
+    expect(visibleText).not.toContain("품질 게이트");
+    expect(result.textElementCount).toBe(16);
     expect(result.relationCount).toBe(6);
 
     const rects = result.scene.elements.filter((element) => element.type === "rectangle");
@@ -202,5 +204,50 @@ describe("diagram generation", () => {
       expect(owner, `text without containing panel: ${text.text}`).toBeTruthy();
       expect(text.y + text.height).toBeLessThanOrEqual((owner?.y ?? 0) + (owner?.height ?? 0) - 8);
     }
+  });
+
+  it("does not leak weekly report vocabulary into an unrelated technical note", () => {
+    const notes = [
+      buildNoteContext({
+        path: "21_업무노트/정보기술/Odysseus/05 한글화 로드맵.md",
+        basename: "05 한글화 로드맵",
+        content: [
+          "# Odysseus 한글화 로드맵",
+          "",
+          "한국어 사용자가 Odysseus의 목적, 설치, 보안 주의, Codex CLI 연동, 주요 기능을 영어 문서 장벽 없이 이해하고 실행하게 한다.",
+          "",
+          "## 목적",
+          "- 영어 문서 의존도를 줄이고 설치 전 판단을 돕는다.",
+          "",
+          "## 설치와 로그인",
+          "- Codex CLI 설치 후 OAuth 로그인을 안내한다.",
+          "- Windows 사용자는 PowerShell에서 PATH와 Node 런타임을 확인한다.",
+          "",
+          "## 보안 주의",
+          "- API 키와 토큰은 노트에 쓰지 않는다.",
+          "- 전역 Codex 설정은 변경 전 백업한다.",
+          "",
+          "## 다음 확인",
+          "- 실제 Windows 환경에서 설치 명령과 로그인 흐름을 검증한다.",
+        ].join("\n"),
+      }),
+    ];
+
+    const result = buildDiagram(notes, defaultDiagramOptions("Odysseus", "Unit test", "whiteboard"));
+    const visibleText = result.scene.elements
+      .filter((element) => element.type === "text")
+      .map((element) => element.text)
+      .join("\n");
+
+    expect(visibleText).toContain("Odysseus 한글화 로드맵");
+    expect(visibleText).toContain("Codex CLI");
+    expect(visibleText).toContain("OAuth");
+    expect(visibleText).toContain("보안");
+    expect(visibleText).toContain("Windows");
+    expect(visibleText).not.toContain("W25");
+    expect(visibleText).not.toContain("출하");
+    expect(visibleText).not.toContain("운임");
+    expect(visibleText).not.toContain("판매/수요");
+    expect(visibleText).not.toContain("운영 회복");
   });
 });
