@@ -1112,15 +1112,15 @@ class CodexExcalidrawPanelView extends ItemView {
     });
 
     const tools = header.createDiv({ cls: "codex-excalidraw-panel-toolbar" });
-    this.addToolButton(tools, "sliders-horizontal", "모델 / 스타일", () => {
+    this.addToolButton(tools, "sliders-horizontal", "모델", () => {
       new PanelRuntimeStyleModal(this.plugin.app, this.plugin, this).open();
-    }, this.isRunning);
-    this.addToolButton(tools, "wand-sparkles", "프롬프트 도구", () => {
+    }, this.isRunning, "모델 / 스타일");
+    this.addToolButton(tools, "wand-sparkles", "프롬프트", () => {
       new PanelPromptToolsModal(this.plugin.app, this).open();
-    }, this.isRunning);
-    this.addToolButton(tools, "network", "드로잉 / Canvas 작업", () => {
+    }, this.isRunning, "프롬프트 도구");
+    this.addToolButton(tools, "network", "작업", () => {
       new PanelActionModal(this.plugin.app, this).open();
-    }, this.isRunning);
+    }, this.isRunning, "드로잉 / Canvas 작업");
 
     const meta = root.createDiv({ cls: "codex-excalidraw-panel-meta" });
     meta.createSpan({ text: this.compactRuntimeSummary() });
@@ -1306,18 +1306,18 @@ class CodexExcalidrawPanelView extends ItemView {
 
     const composerBar = composer.createDiv({ cls: "codex-excalidraw-panel-composer-bar" });
     const leftTools = composerBar.createDiv({ cls: "codex-excalidraw-panel-composer-tools" });
-    this.addToolButton(leftTools, "sliders-horizontal", "모델 / 스타일", () => {
+    this.addToolButton(leftTools, "sliders-horizontal", "모델", () => {
       new PanelRuntimeStyleModal(this.plugin.app, this.plugin, this).open();
-    }, this.isRunning);
+    }, this.isRunning, "모델 / 스타일");
     this.addToolButton(leftTools, "wand-sparkles", "프롬프트", () => {
       new PanelPromptToolsModal(this.plugin.app, this).open();
-    }, this.isRunning);
+    }, this.isRunning, "프롬프트 도구");
     this.addToolButton(leftTools, "network", "작업", () => {
       new PanelActionModal(this.plugin.app, this).open();
-    }, this.isRunning);
-    this.addToolButton(leftTools, "bot", "Codexian 열기", () => {
+    }, this.isRunning, "드로잉 / Canvas 작업");
+    this.addToolButton(leftTools, "bot", "Codexian", () => {
       void this.plugin.openActiveFileInCodexian();
-    }, this.isRunning);
+    }, this.isRunning, "Codexian 열기");
 
     const rightTools = composerBar.createDiv({ cls: "codex-excalidraw-panel-composer-send" });
     const sendButton = rightTools.createEl("button", {
@@ -1340,12 +1340,19 @@ class CodexExcalidrawPanelView extends ItemView {
     button.addEventListener("click", onClick);
   }
 
-  private addToolButton(parent: HTMLElement, icon: string, label: string, onClick: () => void, disabled = false): HTMLButtonElement {
+  private addToolButton(
+    parent: HTMLElement,
+    icon: string,
+    label: string,
+    onClick: () => void,
+    disabled = false,
+    title = label,
+  ): HTMLButtonElement {
     const button = parent.createEl("button", {
       cls: "codex-excalidraw-panel-tool-button",
       attr: {
-        "aria-label": label,
-        title: label,
+        "aria-label": title,
+        title,
       },
     });
     const iconEl = button.createSpan({ cls: "codex-excalidraw-panel-tool-icon" });

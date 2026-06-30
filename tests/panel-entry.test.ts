@@ -53,8 +53,21 @@ describe("Codex drawing panel entry points", () => {
     expect(pluginSource).toContain("preparePanelModal");
     expect(pluginSource).toContain("codex-excalidraw-panel-toolbar");
     expect(pluginSource).toContain("codex-excalidraw-panel-composer-bar");
+    expect(pluginSource).toContain('"모델", () =>');
+    expect(pluginSource).toContain('"Codexian", () =>');
+    expect(pluginSource).toContain('"드로잉 / Canvas 작업"');
     expect(stylesSource).toContain("codex-excalidraw-config-modal");
     expect(stylesSource).toContain("codex-excalidraw-modal-card");
+  });
+
+  it("lays out panel toolbar buttons as compact single-line controls", () => {
+    expect(stylesSource).toContain("grid-template-columns: repeat(3, minmax(0, 1fr))");
+    expect(stylesSource).toContain("flex-wrap: nowrap");
+    expect(stylesSource).toContain("white-space: nowrap");
+    expect(stylesSource).toContain("word-break: keep-all");
+    expect(stylesSource).toContain(".codex-excalidraw-panel-status-head .codex-excalidraw-panel-section-title");
+    expect(stylesSource).toContain(".codex-excalidraw-panel-toolbar .codex-excalidraw-panel-tool-button");
+    expect(stylesSource).toContain(".codex-excalidraw-panel-composer-tools .codex-excalidraw-panel-tool-button");
   });
 
   it("prevents prompt/action modal cards from collapsing into overlapping button rows", () => {

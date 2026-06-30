@@ -30,96 +30,141 @@
 .codex-excalidraw-panel {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
   height: 100%;
-  padding: 14px;
+  padding: 16px 14px;
   user-select: text;
   -webkit-user-select: text;
 }
 
 .codex-excalidraw-panel h2 {
   color: var(--text-normal);
-  font-size: 18px;
-  font-weight: 700;
-  line-height: 1.2;
+  font-size: 20px;
+  font-weight: 760;
+  letter-spacing: 0;
+  line-height: 1.12;
   margin: 0;
 }
 
 .codex-excalidraw-panel-header {
-  align-items: flex-start;
-  display: flex;
+  background: linear-gradient(180deg, var(--background-primary), var(--background-secondary));
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 14px;
+  display: grid;
   gap: 10px;
-  justify-content: space-between;
+  padding: 12px;
 }
 
 .codex-excalidraw-panel-identity {
   display: grid;
-  gap: 6px;
+  gap: 7px;
   min-width: 0;
 }
 
 .codex-excalidraw-panel-current {
   color: var(--text-muted);
-  font-size: 11px;
-  line-height: 1.4;
-  max-height: 44px;
+  display: -webkit-box;
+  font-size: 12px;
+  line-height: 1.35;
+  max-height: 36px;
   overflow: hidden;
   text-overflow: ellipsis;
-  word-break: break-word;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
 }
 
 .codex-excalidraw-panel-meta {
   align-items: center;
   color: var(--text-muted);
-  display: flex;
-  color: var(--text-muted);
+  display: block;
   font-size: 11px;
   line-height: 1.4;
   min-width: 0;
   overflow: hidden;
+  padding: 0 2px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.codex-excalidraw-panel-toolbar,
+.codex-excalidraw-panel-toolbar {
+  align-items: center;
+  display: grid;
+  gap: 6px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  width: 100%;
+}
+
 .codex-excalidraw-panel-composer-tools {
   align-items: center;
   display: flex;
-  flex-wrap: wrap;
+  flex: 1 1 auto;
+  flex-wrap: nowrap;
   gap: 6px;
+  min-width: 0;
+  overflow-x: auto;
+  padding-bottom: 1px;
+  scrollbar-width: none;
+}
+
+.codex-excalidraw-panel-composer-tools::-webkit-scrollbar {
+  display: none;
 }
 
 .codex-excalidraw-panel-tool-button {
   align-items: center;
   background: var(--background-secondary);
   border: 1px solid var(--background-modifier-border);
-  border-radius: 8px;
+  border-radius: 10px;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.03);
   color: var(--text-muted);
   display: inline-flex;
+  flex: 0 0 auto;
+  flex-direction: row;
   gap: 5px;
-  height: 30px;
+  height: 34px;
   justify-content: center;
   max-width: 100%;
-  padding: 0 8px;
+  min-width: 0;
+  overflow: hidden;
+  padding: 0 10px;
+  white-space: nowrap;
+  word-break: keep-all;
 }
 
 .codex-excalidraw-panel-tool-button:hover:not(:disabled) {
-  background: var(--background-modifier-hover);
+  background: var(--background-primary);
+  border-color: var(--interactive-accent);
   color: var(--text-normal);
+}
+
+.codex-excalidraw-panel-toolbar .codex-excalidraw-panel-tool-button {
+  width: 100%;
+}
+
+.codex-excalidraw-panel-composer-tools .codex-excalidraw-panel-tool-button {
+  max-width: 132px;
 }
 
 .codex-excalidraw-panel-tool-icon {
   align-items: center;
   display: inline-flex;
+  flex: 0 0 16px;
   height: 16px;
   width: 16px;
 }
 
 .codex-excalidraw-panel-tool-label {
-  font-size: 11px;
+  display: block;
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  word-break: keep-all;
 }
 
 .codex-excalidraw-panel-chat-shell {
@@ -247,15 +292,18 @@
 }
 
 .codex-excalidraw-panel-composer-bar {
-  align-items: center;
+  align-items: flex-end;
   display: flex;
   gap: 8px;
   justify-content: space-between;
+  min-width: 0;
 }
 
 .codex-excalidraw-panel-composer-send {
   align-items: center;
   display: flex;
+  flex: 0 0 auto;
+  justify-content: flex-end;
 }
 
 .codex-excalidraw-panel-section-title {
@@ -317,14 +365,21 @@
   justify-content: space-between;
 }
 
+.codex-excalidraw-panel-status-head .codex-excalidraw-panel-section-title {
+  flex-basis: auto;
+}
+
 .codex-excalidraw-panel-status-pill {
   background: var(--background-secondary);
   border: 1px solid var(--background-modifier-border);
   border-radius: 999px;
   color: var(--text-muted);
+  flex: 0 0 auto;
   font-size: 11px;
   line-height: 1;
   padding: 5px 8px;
+  white-space: nowrap;
+  word-break: keep-all;
 }
 
 .codex-excalidraw-panel-phase-rail {
