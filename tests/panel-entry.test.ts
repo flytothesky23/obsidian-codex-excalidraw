@@ -19,14 +19,15 @@ describe("Codex drawing panel entry points", () => {
     expect(pluginSource).toContain("void this.openCodexPanel(false)");
   });
 
-  it("exposes chat and Codexian handoff actions in the side panel", () => {
+  it("exposes chat while keeping Codexian handoff internal instead of a composer shortcut", () => {
     expect(pluginSource).toContain("runCodexChat");
     expect(pluginSource).toContain("openActiveFileInCodexian");
     expect(pluginSource).toContain("Codex 대화창");
     expect(pluginSource).toContain("Codex 입력");
     expect(pluginSource).toContain("대화 보내기");
-    expect(pluginSource).toContain("Codexian 열기");
     expect(pluginSource).toContain("getCodexRuntimeSummary");
+    expect(pluginSource).not.toContain('"Codexian", () =>');
+    expect(pluginSource).not.toContain("Codexian 열기");
   });
 
   it("makes chat output copyable and selectable", () => {
@@ -56,10 +57,45 @@ describe("Codex drawing panel entry points", () => {
     expect(pluginSource).toContain("codex-excalidraw-panel-toolbar");
     expect(pluginSource).toContain("codex-excalidraw-panel-composer-bar");
     expect(pluginSource).toContain('"모델", () =>');
-    expect(pluginSource).toContain('"Codexian", () =>');
     expect(pluginSource).toContain('"드로잉 / Canvas 작업"');
     expect(stylesSource).toContain("codex-excalidraw-config-modal");
     expect(stylesSource).toContain("codex-excalidraw-modal-card");
+  });
+
+  it("uses categorized prompt pickers instead of exposing every prompt at once", () => {
+    expect(pluginSource).toContain("CODEX_PROMPT_CATEGORIES");
+    expect(pluginSource).toContain("selectedCategory");
+    expect(pluginSource).toContain("codex-excalidraw-prompt-picker");
+    expect(pluginSource).toContain("codex-excalidraw-picker-controls");
+    expect(pluginSource).toContain("codex-excalidraw-preset-preview");
+    expect(pluginSource).toContain("buildInstruction");
+    expect(pluginSource).toContain("노트의 도메인을 먼저 판별");
+    expect(stylesSource).toContain("codex-excalidraw-picker-field select");
+    expect(stylesSource).toContain("codex-excalidraw-preset-meta");
+    expect(stylesSource).toContain("codex-excalidraw-preset-instruction");
+  });
+
+  it("shows action choices as output-aware cards with result previews and storage hints", () => {
+    expect(pluginSource).toContain("PANEL_ACTION_CARDS");
+    expect(pluginSource).toContain("codex-excalidraw-action-grid");
+    expect(pluginSource).toContain("codex-excalidraw-action-badge");
+    expect(pluginSource).toContain("codex-excalidraw-action-preview");
+    expect(pluginSource).toContain("getOutputFolderForAction");
+    expect(pluginSource).toContain("저장:");
+    expect(pluginSource).toContain("Excalidraw");
+    expect(pluginSource).toContain("Canvas");
+    expect(stylesSource).toContain("button.codex-excalidraw-action-card");
+    expect(stylesSource).toContain("codex-excalidraw-action-footer");
+    expect(stylesSource).toContain("text-overflow: ellipsis");
+  });
+
+  it("submits chat from Cmd/Ctrl+Enter across keyboard event variants", () => {
+    expect(pluginSource).toContain("function isSubmitShortcut");
+    expect(pluginSource).toContain('event.code === "NumpadEnter"');
+    expect(pluginSource).toContain("event.metaKey || event.ctrlKey");
+    expect(pluginSource).toContain("lastShortcutSubmitAt");
+    expect(pluginSource).toContain('prompt.addEventListener("keydown", submitFromShortcut, { capture: true })');
+    expect(pluginSource).toContain('prompt.addEventListener("keyup", submitFromShortcut, { capture: true })');
   });
 
   it("lays out panel toolbar buttons as compact single-line controls", () => {
@@ -124,6 +160,10 @@ describe("Codex drawing panel entry points", () => {
     expect(pluginSource).toContain("createMarkdownRevisionCopy");
     expect(pluginSource).toContain("MARKDOWN_REVISION_INBOX_FOLDER");
     expect(pluginSource).toContain("00_수집함");
+    expect(settingsSource).toContain("markdownTemplateFolder: string");
+    expect(settingsSource).toContain("visualizationOutputFolder: string");
+    expect(pluginSource).toContain("getPanelMarkdownTemplateFolder");
+    expect(pluginSource).toContain("getPanelVisualizationOutputFolder");
     expect(pluginSource).toContain("shouldCreateMarkdownRevisionCopy");
     expect(pluginSource).toContain("resolveMarkdownRevisionSource");
     expect(pluginSource).toContain("extractMarkdownPathCandidates");

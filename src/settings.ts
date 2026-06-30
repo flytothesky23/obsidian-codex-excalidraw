@@ -5,6 +5,8 @@ import type { CodexPermissionMode, CodexReasoningEffort } from "./codexian-bridg
 
 export interface CodexExcalidrawSettings {
   outputFolder: string;
+  markdownTemplateFolder: string;
+  visualizationOutputFolder: string;
   autoOpenPanel: boolean;
   visualTheme: "chalkboard" | "whiteboard";
   handwritingFontFamily: number;
@@ -25,6 +27,8 @@ export interface CodexExcalidrawSettings {
 
 export const DEFAULT_SETTINGS: CodexExcalidrawSettings = {
   outputFolder: "Excalidraw/Codex Maps",
+  markdownTemplateFolder: "00_수집함",
+  visualizationOutputFolder: "Codex Visual Notes",
   autoOpenPanel: true,
   visualTheme: "chalkboard",
   handwritingFontFamily: 4,
@@ -62,6 +66,32 @@ export class CodexExcalidrawSettingTab extends PluginSettingTab {
           .setValue(this.plugin.settings.outputFolder)
           .onChange(async (value) => {
             this.plugin.settings.outputFolder = value.trim() || DEFAULT_SETTINGS.outputFolder;
+            await this.plugin.saveSettings();
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName("Markdown template folder")
+      .setDesc("Safe Markdown rewrite copies and generated business-note templates are created here.")
+      .addText((text) =>
+        text
+          .setPlaceholder("00_수집함")
+          .setValue(this.plugin.settings.markdownTemplateFolder)
+          .onChange(async (value) => {
+            this.plugin.settings.markdownTemplateFolder = value.trim() || DEFAULT_SETTINGS.markdownTemplateFolder;
+            await this.plugin.saveSettings();
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName("DataviewJS / visual note folder")
+      .setDesc("Prompt tools use this as the target folder for DataviewJS dashboards, mind maps, timelines, and HTML-like visual notes.")
+      .addText((text) =>
+        text
+          .setPlaceholder("Codex Visual Notes")
+          .setValue(this.plugin.settings.visualizationOutputFolder)
+          .onChange(async (value) => {
+            this.plugin.settings.visualizationOutputFolder = value.trim() || DEFAULT_SETTINGS.visualizationOutputFolder;
             await this.plugin.saveSettings();
           }),
       );

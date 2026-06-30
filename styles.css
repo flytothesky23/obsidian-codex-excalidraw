@@ -547,8 +547,8 @@
 
 .codex-excalidraw-config-modal-shell.modal {
   max-height: min(760px, calc(100vh - 64px));
-  max-width: min(760px, calc(100vw - 48px));
-  width: min(760px, calc(100vw - 48px));
+  max-width: min(920px, calc(100vw - 48px));
+  width: min(920px, calc(100vw - 48px));
 }
 
 .codex-excalidraw-config-modal {
@@ -573,6 +573,329 @@
   line-height: 1.5;
   margin: -4px 0 2px;
   max-width: 60ch;
+}
+
+.codex-excalidraw-modal-hero {
+  align-items: center;
+  background:
+    linear-gradient(135deg, rgba(var(--interactive-accent-rgb), 0.12), transparent 42%),
+    var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 16px;
+  display: grid;
+  gap: 14px;
+  grid-template-columns: 56px minmax(0, 1fr);
+  padding: 16px;
+}
+
+.codex-excalidraw-modal-hero-mark,
+.codex-excalidraw-preset-icon,
+.codex-excalidraw-action-icon {
+  align-items: center;
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 14px;
+  display: grid;
+  height: 48px;
+  justify-content: center;
+  position: relative;
+  width: 48px;
+}
+
+.codex-excalidraw-modal-hero-emoji,
+.codex-excalidraw-preset-emoji,
+.codex-excalidraw-action-emoji {
+  font-size: 20px;
+  transform: translate(-6px, -4px);
+}
+
+.codex-excalidraw-modal-hero-icon,
+.codex-excalidraw-preset-svg,
+.codex-excalidraw-action-svg {
+  bottom: 8px;
+  color: var(--interactive-accent);
+  height: 18px;
+  position: absolute;
+  right: 8px;
+  width: 18px;
+}
+
+.codex-excalidraw-modal-hero-copy {
+  min-width: 0;
+}
+
+.codex-excalidraw-modal-hero-copy p {
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.5;
+  margin: 6px 0 0;
+  max-width: 72ch;
+}
+
+.codex-excalidraw-prompt-picker {
+  display: grid;
+  gap: 12px;
+}
+
+.codex-excalidraw-picker-controls {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.codex-excalidraw-picker-field {
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 12px;
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  padding: 12px;
+}
+
+.codex-excalidraw-picker-label {
+  color: var(--text-normal);
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1.2;
+}
+
+.codex-excalidraw-picker-desc {
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.45;
+  min-height: 32px;
+}
+
+.codex-excalidraw-picker-field select {
+  background: var(--background-primary);
+  border-radius: 9px;
+  font-size: 13px;
+  height: 36px;
+  margin: 0;
+  max-width: 100%;
+  min-width: 0;
+  width: 100%;
+}
+
+.codex-excalidraw-preset-preview {
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 16px;
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
+.codex-excalidraw-preset-topline {
+  align-items: center;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 48px minmax(0, 1fr);
+}
+
+.codex-excalidraw-preset-title-block,
+.codex-excalidraw-action-title-block {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.codex-excalidraw-preset-title {
+  color: var(--text-normal);
+  font-size: 18px;
+  font-weight: 780;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.codex-excalidraw-preset-desc {
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.codex-excalidraw-preset-meta {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.codex-excalidraw-preset-meta-item {
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 10px;
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 9px 10px;
+}
+
+.codex-excalidraw-preset-meta-item span {
+  color: var(--text-faint);
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: 0.02em;
+}
+
+.codex-excalidraw-preset-meta-item strong {
+  color: var(--text-normal);
+  font-size: 12px;
+  font-weight: 680;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.codex-excalidraw-preset-instruction {
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 12px;
+  color: var(--text-muted);
+  display: grid;
+  font-size: 12px;
+  gap: 8px;
+  line-height: 1.55;
+  max-height: 170px;
+  overflow: auto;
+  padding: 12px;
+  user-select: text;
+}
+
+.codex-excalidraw-action-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+}
+
+button.codex-excalidraw-action-card {
+  align-items: stretch;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 16px;
+  box-shadow: none;
+  color: var(--text-normal);
+  display: grid;
+  gap: 12px;
+  height: auto;
+  min-height: 250px;
+  overflow: hidden;
+  padding: 14px;
+  text-align: left;
+  white-space: normal;
+  width: 100%;
+}
+
+button.codex-excalidraw-action-card:hover,
+button.codex-excalidraw-action-card:focus-visible {
+  background: var(--background-primary);
+  border-color: var(--interactive-accent);
+}
+
+.codex-excalidraw-action-card-head {
+  align-items: start;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 48px minmax(0, 1fr) auto;
+}
+
+.codex-excalidraw-action-badge {
+  align-self: start;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 999px;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 760;
+  line-height: 1;
+  padding: 6px 8px;
+  white-space: nowrap;
+}
+
+.codex-excalidraw-action-badge-excalidraw {
+  background: rgba(var(--interactive-accent-rgb), 0.11);
+  color: var(--interactive-accent);
+}
+
+.codex-excalidraw-action-badge-canvas {
+  background: rgba(31, 150, 96, 0.12);
+  color: var(--color-green);
+}
+
+.codex-excalidraw-action-badge-brief {
+  background: rgba(214, 134, 36, 0.14);
+  color: var(--color-orange);
+}
+
+.codex-excalidraw-action-preview {
+  background:
+    radial-gradient(circle at 8px 8px, var(--background-modifier-border) 1px, transparent 1.5px),
+    var(--background-primary);
+  background-size: 18px 18px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 12px;
+  display: grid;
+  gap: 8px;
+  min-height: 86px;
+  padding: 12px;
+}
+
+.codex-excalidraw-action-preview span {
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  color: var(--text-muted);
+  display: block;
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 1;
+  max-width: 84%;
+  overflow: hidden;
+  padding: 7px 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.codex-excalidraw-action-preview span:nth-child(2) {
+  justify-self: center;
+}
+
+.codex-excalidraw-action-preview span:nth-child(3) {
+  justify-self: end;
+}
+
+.codex-excalidraw-action-preview-board span {
+  border-color: rgba(var(--interactive-accent-rgb), 0.45);
+}
+
+.codex-excalidraw-action-preview-canvas span {
+  border-color: rgba(31, 150, 96, 0.35);
+}
+
+.codex-excalidraw-action-preview-revise span,
+.codex-excalidraw-action-preview-brief span {
+  border-color: rgba(214, 134, 36, 0.35);
+}
+
+.codex-excalidraw-action-preview-svg span {
+  border-radius: 999px;
+}
+
+.codex-excalidraw-action-footer {
+  align-items: center;
+  border-top: 1px solid var(--background-modifier-border);
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding-top: 10px;
+}
+
+.codex-excalidraw-action-folder {
+  color: var(--text-faint);
+  font-size: 11px;
+  line-height: 1.35;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .codex-excalidraw-modal-value {
@@ -686,7 +1009,23 @@ button.codex-excalidraw-modal-card:focus-visible .codex-excalidraw-modal-card-ac
     width: calc(100vw - 24px);
   }
 
-  .codex-excalidraw-modal-card-grid {
+  .codex-excalidraw-picker-controls,
+  .codex-excalidraw-preset-meta,
+  .codex-excalidraw-modal-card-grid,
+  .codex-excalidraw-action-grid {
     grid-template-columns: 1fr;
+  }
+
+  .codex-excalidraw-modal-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .codex-excalidraw-action-card-head {
+    grid-template-columns: 48px minmax(0, 1fr);
+  }
+
+  .codex-excalidraw-action-badge {
+    grid-column: 1 / -1;
+    justify-self: start;
   }
 }

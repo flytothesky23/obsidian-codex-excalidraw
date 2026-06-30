@@ -28,12 +28,22 @@ import { buildDiagram, defaultDiagramOptions } from "./diagram";
 import { createScene, renderExcalidrawMarkdown } from "./excalidraw";
 import { buildNoteContext, truncate } from "./markdown";
 import { FolderSuggestModal, MultiFileModal } from "./modals";
-import { actionLabel, CODEX_PROMPT_PRESETS, type CodexPanelAction } from "./prompt-presets";
+import {
+  actionLabel,
+  CODEX_PROMPT_CATEGORIES,
+  CODEX_PROMPT_PRESETS,
+  firstPresetForCategory,
+  getPromptCategory,
+  type CodexPanelAction,
+  type CodexPromptCategoryId,
+  type CodexPromptPreset,
+} from "./prompt-presets";
 import { CodexExcalidrawSettingTab, DEFAULT_SETTINGS, type CodexExcalidrawSettings } from "./settings";
 import type { NoteContext, NoteLink } from "./types";
 
 const CODEX_EXCALIDRAW_PANEL_VIEW = "codex-excalidraw-panel";
 const MARKDOWN_REVISION_INBOX_FOLDER = "00_수집함";
+type PanelActionCardId = CodexPanelAction | "basic-study-note" | "copy-brief";
 
 export default class CodexExcalidrawPlugin extends Plugin {
   settings: CodexExcalidrawSettings = DEFAULT_SETTINGS;
@@ -419,6 +429,18 @@ export default class CodexExcalidrawPlugin extends Plugin {
     return `${label}: ${runtime.command} · ${runtime.model ?? "configured model"} · ${runtime.reasoningEffort ?? "configured reasoning"} · ${runtime.permissionMode}`;
   }
 
+  getPanelVisualOutputFolder(): string {
+    return this.getCodexWritableOutputFolder();
+  }
+
+  getPanelMarkdownTemplateFolder(): string {
+    return normalizePath(this.settings.markdownTemplateFolder || DEFAULT_SETTINGS.markdownTemplateFolder || MARKDOWN_REVISION_INBOX_FOLDER);
+  }
+
+  getPanelVisualizationOutputFolder(): string {
+    return normalizePath(this.settings.visualizationOutputFolder || DEFAULT_SETTINGS.visualizationOutputFolder);
+  }
+
   private async createFromFolder(folder: TFolder, runCodex = false): Promise<void> {
     const folderPrefix = folder.path && folder.path !== "/" ? `${folder.path}/` : "";
     const files = this.app.vault
@@ -529,7 +551,7 @@ export default class CodexExcalidrawPlugin extends Plugin {
 
   private async createMarkdownRevisionCopy(source: TFile): Promise<TFile> {
     const content = await this.app.vault.cachedRead(source);
-    await this.ensureFolder(MARKDOWN_REVISION_INBOX_FOLDER);
+    await this.ensureFolder(this.getPanelMarkdownTemplateFolder());
     const path = await this.nextMarkdownRevisionPath(`${source.basename}_수정`);
     const created = await this.app.vault.create(path, content);
     if (!(created instanceof TFile)) {
@@ -540,7 +562,7 @@ export default class CodexExcalidrawPlugin extends Plugin {
   }
 
   private async nextMarkdownRevisionPath(basename: string): Promise<string> {
-    const folder = MARKDOWN_REVISION_INBOX_FOLDER;
+    const folder = this.getPanelMarkdownTemplateFolder();
     let counter = 1;
     let path = normalizePath(`${folder}/${basename}.md`);
     while (this.app.vault.getAbstractFileByPath(path)) {
@@ -1088,15 +1110,41 @@ function extractOutputPath(value: string): string {
 function panelActionPrompt(action: CodexPanelAction): string {
   switch (action) {
     case "study-note":
-      return "Create a one-screen Korean handwritten study note that improves understanding more than the original Markdown.";
+      return [
+        "Create a one-screen Korean handwritten study note that improves understanding more than the original Markdown.",
+        "First infer the source note's domain and genre. Do not reuse fixed business-report labels, freight vocabulary, PSBall, W25, or KPI panels unless they are actually in the source.",
+        "Choose the simplest visual form that fits the source: teacher-board explanation, concept map, decision spine, timeline, risk matrix, or checklist.",
+        "The first visible line must be the reader's real question. The center must carry the provisional conclusion. Supporting boxes must explain why the conclusion changes, not merely restate facts.",
+        "Use editable Excalidraw text and shapes. Keep Korean handwriting readable: generous margins, no overlaps, no tiny text, no raw IDs.",
+      ].join("\n");
     case "obsidian-canvas":
-      return "Create or revise an Obsidian JSON Canvas: arrange file nodes, concept nodes, groups, colors, and edges so Claude/Codex can keep editing the plain JSON.";
+      return [
+        "Create or revise an Obsidian JSON Canvas that acts as an editable knowledge map, not a decorative dashboard.",
+        "Keep source Markdown file nodes openable. Add concept, evidence, uncertainty, and next-action nodes only when they are anchored to the source.",
+        "Use groups to separate source material, interpretation, risks, and follow-up. Every edge label should explain the relationship, not just say related.",
+        "Remove placeholder nodes. Make the JSON valid and easy for future AI passes to rearrange.",
+      ].join("\n");
     case "context-map":
-      return "Create a semantic context diagram: synthesize claims, causes, evidence, tensions, and follow-up questions across the source notes.";
+      return [
+        "Create a semantic context diagram that helps a reader understand the note faster than reading the Markdown.",
+        "Infer the note genre first, then pick a structure. Valid structures include cause-effect spine, decision tree, evidence map, operating flow, timeline, or risk matrix.",
+        "Synthesize claims, causes, evidence, tensions, caveats, and follow-up questions. Do not copy paragraphs into boxes.",
+        "End with the condition that would change the conclusion or the next evidence required.",
+      ].join("\n");
     case "svg-sketch":
-      return "Create an editable Excalidraw drawing with SVG-like diagram discipline: clean geometry, strong hierarchy, minimal color, and readable handwritten labels.";
+      return [
+        "Create an editable Excalidraw drawing with SVG-like diagram discipline: clean geometry, strong hierarchy, minimal color, and readable Korean labels.",
+        "Use spatial hierarchy before color. Use no more than three accent colors and no decorative fills unless they encode meaning.",
+        "Every shape must have a reason: source, concept, decision, risk, evidence, or next action.",
+        "The result must remain editable Excalidraw, not a pasted image.",
+      ].join("\n");
     case "revise-active":
-      return "Revise the active drawing according to the user's instruction while preserving source-backed meaning.";
+      return [
+        "Revise the active drawing according to the user's instruction while preserving source-backed meaning.",
+        "Before editing, read the current drawing and any `codex_sources`. Diagnose the top three visual defects: unreadable text, weak hierarchy, missing insight, bad layout, or unsupported claims.",
+        "Fix those defects directly. Do not add decorative complexity. Keep all Korean text readable at normal zoom.",
+        "Report what changed and which source logic remains protected.",
+      ].join("\n");
   }
 }
 
@@ -1129,6 +1177,7 @@ class CodexExcalidrawPanelView extends ItemView {
   private activityLines: string[] = [];
   private currentPhase: PanelPhase = "idle";
   private phaseDetail = "대기 중";
+  private lastShortcutSubmitAt = 0;
 
   constructor(leaf: WorkspaceLeaf, private plugin: CodexExcalidrawPlugin) {
     super(leaf);
@@ -1397,12 +1446,18 @@ class CodexExcalidrawPanelView extends ItemView {
     prompt.addEventListener("input", () => {
       this.promptValue = prompt.value;
     });
-    prompt.addEventListener("keydown", (event) => {
-      if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
-        event.preventDefault();
-        void this.runChat();
-      }
-    });
+    const submitFromShortcut = (event: KeyboardEvent) => {
+      if (!isSubmitShortcut(event)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const now = Date.now();
+      if (now - this.lastShortcutSubmitAt < 650) return;
+      this.lastShortcutSubmitAt = now;
+      this.promptValue = prompt.value;
+      void this.runChat();
+    };
+    prompt.addEventListener("keydown", submitFromShortcut, { capture: true });
+    prompt.addEventListener("keyup", submitFromShortcut, { capture: true });
 
     const composerBar = composer.createDiv({ cls: "codex-excalidraw-panel-composer-bar" });
     const leftTools = composerBar.createDiv({ cls: "codex-excalidraw-panel-composer-tools" });
@@ -1415,9 +1470,6 @@ class CodexExcalidrawPanelView extends ItemView {
     this.addToolButton(leftTools, "network", "작업", () => {
       new PanelActionModal(this.plugin.app, this).open();
     }, this.isRunning, "드로잉 / Canvas 작업");
-    this.addToolButton(leftTools, "bot", "Codexian", () => {
-      void this.plugin.openActiveFileInCodexian();
-    }, this.isRunning, "Codexian 열기");
 
     const rightTools = composerBar.createDiv({ cls: "codex-excalidraw-panel-composer-send" });
     const sendButton = rightTools.createEl("button", {
@@ -1517,6 +1569,29 @@ class CodexExcalidrawPanelView extends ItemView {
     this.statusText = text;
     this.pushActivity(text);
     this.render();
+  }
+
+  getOutputFolderForPrompt(preset: CodexPromptPreset): string {
+    if (preset.category === "md-template") return this.plugin.getPanelMarkdownTemplateFolder();
+    if (preset.category === "dataview-visual") return this.plugin.getPanelVisualizationOutputFolder();
+    return this.plugin.getPanelVisualOutputFolder();
+  }
+
+  getOutputFolderForAction(action: PanelActionCardId): string {
+    switch (action) {
+      case "basic-study-note":
+        return normalizePath(this.plugin.settings.outputFolder || DEFAULT_SETTINGS.outputFolder);
+      case "revise-active":
+        return "현재 열려 있는 Excalidraw 파일";
+      case "copy-brief":
+        return "클립보드";
+      case "obsidian-canvas":
+      case "study-note":
+      case "context-map":
+      case "svg-sketch":
+      default:
+        return this.plugin.getPanelVisualOutputFolder();
+    }
   }
 
   async runPanelAction(action: CodexPanelAction): Promise<void> {
@@ -1801,6 +1876,10 @@ class PanelRuntimeStyleModal extends Modal {
 }
 
 class PanelPromptToolsModal extends Modal {
+  private selectedCategory: CodexPromptCategoryId = CODEX_PROMPT_CATEGORIES[0].id;
+  private selectedPreset: CodexPromptPreset = firstPresetForCategory(this.selectedCategory);
+  private previewEl: HTMLElement | null = null;
+
   constructor(
     app: ConstructorParameters<typeof Modal>[0],
     private view: CodexExcalidrawPanelView,
@@ -1812,30 +1891,123 @@ class PanelPromptToolsModal extends Modal {
     const { contentEl } = this;
     contentEl.empty();
     preparePanelModal(this, contentEl);
-    contentEl.createEl("h2", { text: "프롬프트 도구" });
-    contentEl.createEl("p", {
-      cls: "codex-excalidraw-config-note",
-      text: "현재 입력창에 추가할 작업 성격을 고르세요.",
-    });
-    const grid = contentEl.createDiv({ cls: "codex-excalidraw-modal-card-grid" });
-    for (const preset of CODEX_PROMPT_PRESETS) {
-      const card = grid.createEl("button", { cls: "codex-excalidraw-modal-card" });
-      card.setAttr("type", "button");
-      card.setAttr("aria-label", `${preset.label} 프롬프트 추가`);
-      card.createSpan({ cls: "codex-excalidraw-modal-card-kicker", text: "프롬프트" });
-      const body = card.createDiv({ cls: "codex-excalidraw-modal-card-body" });
-      body.createSpan({ cls: "codex-excalidraw-modal-card-title", text: preset.label });
-      body.createSpan({ cls: "codex-excalidraw-modal-card-desc", text: truncate(preset.instruction, 130) });
-      card.createSpan({ cls: "codex-excalidraw-modal-card-action", text: "추가" });
-      card.addEventListener("click", () => {
-        this.view.applyPromptPreset(preset.label, preset.instruction);
-        this.close();
+    this.renderModalHero(contentEl, "프롬프트 도구", "상황별 업무 템플릿과 시각화 프롬프트를 선택해 현재 입력창에 추가합니다.", "wand-sparkles", "✨");
+
+    const picker = contentEl.createDiv({ cls: "codex-excalidraw-prompt-picker" });
+    const controls = picker.createDiv({ cls: "codex-excalidraw-picker-controls" });
+    const categoryField = this.createPickerField(controls, "카테고리", "노트 템플릿, DataviewJS/시각화, 드로잉 보정 중 선택합니다.");
+    const categorySelect = categoryField.createEl("select");
+    for (const category of CODEX_PROMPT_CATEGORIES) {
+      categorySelect.createEl("option", {
+        text: `${category.emoji} ${category.label}`,
+        value: category.id,
       });
     }
+
+    const presetField = this.createPickerField(controls, "템플릿", "선택한 카테고리에 맞는 프롬프트 방식만 표시합니다.");
+    const presetSelect = presetField.createEl("select");
+    const populatePresetSelect = () => {
+      presetSelect.empty();
+      const presets = CODEX_PROMPT_PRESETS.filter((preset) => preset.category === this.selectedCategory);
+      for (const preset of presets) {
+        presetSelect.createEl("option", {
+          text: `${preset.emoji} ${preset.label}`,
+          value: preset.id,
+        });
+      }
+      presetSelect.value = this.selectedPreset.id;
+    };
+    categorySelect.value = this.selectedCategory;
+    populatePresetSelect();
+    categorySelect.addEventListener("change", () => {
+      this.selectedCategory = categorySelect.value as CodexPromptCategoryId;
+      this.selectedPreset = firstPresetForCategory(this.selectedCategory);
+      populatePresetSelect();
+      this.renderPresetPreview();
+    });
+    presetSelect.addEventListener("change", () => {
+      this.selectedPreset = CODEX_PROMPT_PRESETS.find((preset) => preset.id === presetSelect.value) ?? this.selectedPreset;
+      this.renderPresetPreview();
+    });
+
+    this.previewEl = picker.createDiv({ cls: "codex-excalidraw-preset-preview" });
+    this.renderPresetPreview();
   }
 
   onClose(): void {
     this.contentEl.empty();
+  }
+
+  private createPickerField(parent: HTMLElement, label: string, description: string): HTMLElement {
+    const field = parent.createDiv({ cls: "codex-excalidraw-picker-field" });
+    field.createDiv({ cls: "codex-excalidraw-picker-label", text: label });
+    field.createDiv({ cls: "codex-excalidraw-picker-desc", text: description });
+    return field;
+  }
+
+  private renderPresetPreview(): void {
+    if (!this.previewEl) return;
+    this.previewEl.empty();
+    const category = getPromptCategory(this.selectedPreset.category);
+    const outputFolder = this.view.getOutputFolderForPrompt(this.selectedPreset);
+
+    const top = this.previewEl.createDiv({ cls: "codex-excalidraw-preset-topline" });
+    const iconWrap = top.createDiv({ cls: "codex-excalidraw-preset-icon" });
+    iconWrap.createSpan({ cls: "codex-excalidraw-preset-emoji", text: this.selectedPreset.emoji });
+    const svgIcon = iconWrap.createSpan({ cls: "codex-excalidraw-preset-svg" });
+    setIcon(svgIcon, this.selectedPreset.icon);
+    const title = top.createDiv({ cls: "codex-excalidraw-preset-title-block" });
+    title.createDiv({ cls: "codex-excalidraw-modal-card-kicker", text: `${category.emoji} ${category.label}` });
+    title.createDiv({ cls: "codex-excalidraw-preset-title", text: this.selectedPreset.label });
+    title.createDiv({ cls: "codex-excalidraw-preset-desc", text: this.selectedPreset.description });
+
+    const meta = this.previewEl.createDiv({ cls: "codex-excalidraw-preset-meta" });
+    this.addMeta(meta, "종류", this.selectedPreset.kind);
+    this.addMeta(meta, "저장", outputFolder);
+    this.addMeta(meta, "힌트", this.selectedPreset.outputHint);
+
+    const preview = this.previewEl.createDiv({ cls: "codex-excalidraw-preset-instruction" });
+    preview.createDiv({ cls: "codex-excalidraw-modal-card-kicker", text: "프롬프트 미리보기" });
+    preview.createDiv({ text: truncate(this.selectedPreset.instruction, 420) });
+
+    const footer = this.previewEl.createDiv({ cls: "codex-excalidraw-modal-footer" });
+    footer.createEl("button", { text: "닫기" }).addEventListener("click", () => this.close());
+    const add = footer.createEl("button", { text: "입력창에 추가" });
+    add.addClass("mod-cta");
+    add.addEventListener("click", () => {
+      this.view.applyPromptPreset(this.selectedPreset.label, this.buildInstruction(this.selectedPreset, outputFolder));
+      this.close();
+    });
+  }
+
+  private addMeta(parent: HTMLElement, label: string, value: string): void {
+    const item = parent.createDiv({ cls: "codex-excalidraw-preset-meta-item" });
+    item.createSpan({ text: label });
+    item.createEl("strong", { text: value });
+  }
+
+  private buildInstruction(preset: CodexPromptPreset, outputFolder: string): string {
+    return [
+      preset.instruction,
+      "",
+      "# 저장/작업 기준",
+      `- 이 프롬프트의 권장 산출물: ${preset.kind}`,
+      `- 저장 또는 새 파일 생성이 필요한 경우 우선 폴더: ${outputFolder}`,
+      "- 원본 Markdown 노트는 직접 덮어쓰지 말고, 수정이 필요하면 안전한 사본이나 새 산출물에 적용하라.",
+      "- 노트의 도메인을 먼저 판별하고, 특정 경영분석/운임/PSBall 같은 예시 용어를 원문에 없으면 절대 끌어오지 말라.",
+      "- 결과는 예쁘기보다 판단과 이해가 빨라야 하며, 마지막에 무엇이 좋아졌는지 3줄 이내로 보고하라.",
+    ].join("\n");
+  }
+
+  private renderModalHero(contentEl: HTMLElement, title: string, subtitle: string, icon: string, emoji: string): void {
+    const hero = contentEl.createDiv({ cls: "codex-excalidraw-modal-hero" });
+    const mark = hero.createDiv({ cls: "codex-excalidraw-modal-hero-mark" });
+    mark.createSpan({ cls: "codex-excalidraw-modal-hero-emoji", text: emoji });
+    const iconEl = mark.createSpan({ cls: "codex-excalidraw-modal-hero-icon" });
+    setIcon(iconEl, icon);
+    const copy = hero.createDiv({ cls: "codex-excalidraw-modal-hero-copy" });
+    copy.createEl("h2", { text: title });
+    copy.createEl("p", { text: subtitle });
   }
 }
 
@@ -1851,55 +2023,162 @@ class PanelActionModal extends Modal {
     const { contentEl } = this;
     contentEl.empty();
     preparePanelModal(this, contentEl);
-    contentEl.createEl("h2", { text: "드로잉 / Canvas 작업" });
-    contentEl.createEl("p", {
-      cls: "codex-excalidraw-config-note",
-      text: "현재 활성 노트나 드로잉을 기준으로 실행할 작업을 선택하세요.",
-    });
+    this.renderModalHero(contentEl, "드로잉 / Canvas 작업", "현재 활성 노트나 드로잉을 기준으로 만들 결과물의 형태를 고르세요.", "network", "🗺️");
 
-    const grid = contentEl.createDiv({ cls: "codex-excalidraw-modal-card-grid" });
-    this.addActionCard(grid, "노트→한눈필기", "Codex 없이 현재 노트 기반 기본 Excalidraw 필기를 생성합니다.", () => {
-      void this.view.runNoteStudyAction();
-    });
-    this.addActionCard(grid, "Codex 한눈필기", "Codex가 원문을 읽고 선생님 필기식 Excalidraw를 재구성합니다.", () => {
-      void this.view.runPanelAction("study-note");
-    });
-    this.addActionCard(grid, "Obsidian Canvas", "원문 파일 노드와 개념·근거 노드를 연결한 JSON Canvas를 생성/수정합니다.", () => {
-      void this.view.runPanelAction("obsidian-canvas");
-    });
-    this.addActionCard(grid, "Codex 맥락도", "질문, 결론, 원인, 근거, 불확실성, 검증 흐름으로 맥락도를 만듭니다.", () => {
-      void this.view.runPanelAction("context-map");
-    });
-    this.addActionCard(grid, "현재 드로잉 수정", "열려 있는 Excalidraw 드로잉을 현재 입력 지시대로 다시 정리합니다.", () => {
-      void this.view.runPanelAction("revise-active");
-    });
-    this.addActionCard(grid, "SVG식 도식", "기하학적으로 정돈된 SVG식 Excalidraw 도식을 생성합니다.", () => {
-      void this.view.runPanelAction("svg-sketch");
-    });
-    this.addActionCard(grid, "브리프 복사", "현재 노트 기반 Codex 작업 브리프를 클립보드로 복사합니다.", () => {
-      void this.view.copyBriefAction();
-    });
+    const grid = contentEl.createDiv({ cls: "codex-excalidraw-action-grid" });
+    for (const card of PANEL_ACTION_CARDS) {
+      this.addActionCard(grid, card);
+    }
   }
 
   onClose(): void {
     this.contentEl.empty();
   }
 
-  private addActionCard(parent: HTMLElement, title: string, description: string, run: () => void): void {
-    const card = parent.createEl("button", { cls: "codex-excalidraw-modal-card" });
+  private addActionCard(parent: HTMLElement, spec: PanelActionCardSpec): void {
+    const card = parent.createEl("button", { cls: "codex-excalidraw-action-card" });
     card.setAttr("type", "button");
-    card.setAttr("aria-label", `${title} 실행`);
-    card.createSpan({ cls: "codex-excalidraw-modal-card-kicker", text: "작업" });
-    const body = card.createDiv({ cls: "codex-excalidraw-modal-card-body" });
-    body.createSpan({ cls: "codex-excalidraw-modal-card-title", text: title });
-    body.createSpan({ cls: "codex-excalidraw-modal-card-desc", text: description });
-    card.createSpan({ cls: "codex-excalidraw-modal-card-action", text: "실행" });
+    card.setAttr("aria-label", `${spec.label} 실행`);
+    const head = card.createDiv({ cls: "codex-excalidraw-action-card-head" });
+    const iconWrap = head.createDiv({ cls: "codex-excalidraw-action-icon" });
+    iconWrap.createSpan({ cls: "codex-excalidraw-action-emoji", text: spec.emoji });
+    const icon = iconWrap.createSpan({ cls: "codex-excalidraw-action-svg" });
+    setIcon(icon, spec.icon);
+    const title = head.createDiv({ cls: "codex-excalidraw-action-title-block" });
+    title.createDiv({ cls: "codex-excalidraw-modal-card-title", text: spec.label });
+    title.createDiv({ cls: "codex-excalidraw-modal-card-desc", text: spec.description });
+    head.createSpan({
+      cls: `codex-excalidraw-action-badge codex-excalidraw-action-badge-${spec.badge.toLowerCase()}`,
+      text: spec.badge,
+    });
+
+    const preview = card.createDiv({ cls: `codex-excalidraw-action-preview codex-excalidraw-action-preview-${spec.previewKind}` });
+    for (const line of spec.previewLines) {
+      preview.createSpan({ text: line });
+    }
+
+    const footer = card.createDiv({ cls: "codex-excalidraw-action-footer" });
+    footer.createSpan({ cls: "codex-excalidraw-action-folder", text: `저장: ${this.view.getOutputFolderForAction(spec.id)}` });
+    footer.createSpan({ cls: "codex-excalidraw-modal-card-action", text: "실행" });
+
     card.addEventListener("click", () => {
       this.close();
-      run();
+      this.runAction(spec.id);
     });
   }
+
+  private runAction(id: PanelActionCardId): void {
+    switch (id) {
+      case "basic-study-note":
+        void this.view.runNoteStudyAction();
+        return;
+      case "copy-brief":
+        void this.view.copyBriefAction();
+        return;
+      case "study-note":
+      case "obsidian-canvas":
+      case "context-map":
+      case "revise-active":
+      case "svg-sketch":
+        void this.view.runPanelAction(id);
+    }
+  }
+
+  private renderModalHero(contentEl: HTMLElement, title: string, subtitle: string, icon: string, emoji: string): void {
+    const hero = contentEl.createDiv({ cls: "codex-excalidraw-modal-hero" });
+    const mark = hero.createDiv({ cls: "codex-excalidraw-modal-hero-mark" });
+    mark.createSpan({ cls: "codex-excalidraw-modal-hero-emoji", text: emoji });
+    const iconEl = mark.createSpan({ cls: "codex-excalidraw-modal-hero-icon" });
+    setIcon(iconEl, icon);
+    const copy = hero.createDiv({ cls: "codex-excalidraw-modal-hero-copy" });
+    copy.createEl("h2", { text: title });
+    copy.createEl("p", { text: subtitle });
+  }
 }
+
+interface PanelActionCardSpec {
+  id: PanelActionCardId;
+  label: string;
+  emoji: string;
+  icon: string;
+  badge: "Excalidraw" | "Canvas" | "Brief";
+  previewKind: "board" | "canvas" | "flow" | "revise" | "svg" | "brief";
+  previewLines: string[];
+  description: string;
+}
+
+const PANEL_ACTION_CARDS: PanelActionCardSpec[] = [
+  {
+    id: "basic-study-note",
+    label: "노트→한눈필기",
+    emoji: "✍️",
+    icon: "notebook-pen",
+    badge: "Excalidraw",
+    previewKind: "board",
+    previewLines: ["질문", "결론", "근거"],
+    description: "Codex 없이 현재 노트 기반 기본 Excalidraw 필기를 빠르게 생성합니다.",
+  },
+  {
+    id: "study-note",
+    label: "Codex 한눈필기",
+    emoji: "👩‍🏫",
+    icon: "graduation-cap",
+    badge: "Excalidraw",
+    previewKind: "board",
+    previewLines: ["질문", "잠정 결론", "다음 확인"],
+    description: "Codex가 원문을 읽고 선생님 필기식 Excalidraw로 재구성합니다.",
+  },
+  {
+    id: "obsidian-canvas",
+    label: "Obsidian Canvas",
+    emoji: "🧩",
+    icon: "panel-top",
+    badge: "Canvas",
+    previewKind: "canvas",
+    previewLines: ["원문", "개념", "근거"],
+    description: "원문 파일 노드와 개념·근거 노드를 연결한 JSON Canvas를 생성/수정합니다.",
+  },
+  {
+    id: "context-map",
+    label: "Codex 맥락도",
+    emoji: "🧭",
+    icon: "route",
+    badge: "Excalidraw",
+    previewKind: "flow",
+    previewLines: ["질문", "원인", "검증"],
+    description: "질문, 결론, 원인, 근거, 불확실성, 검증 흐름으로 맥락도를 만듭니다.",
+  },
+  {
+    id: "revise-active",
+    label: "현재 드로잉 수정",
+    emoji: "🛠️",
+    icon: "pencil-ruler",
+    badge: "Excalidraw",
+    previewKind: "revise",
+    previewLines: ["겹침 제거", "글자 확대", "의미 보강"],
+    description: "열려 있는 Excalidraw 드로잉을 현재 입력 지시대로 다시 정리합니다.",
+  },
+  {
+    id: "svg-sketch",
+    label: "SVG식 도식",
+    emoji: "💠",
+    icon: "shapes",
+    badge: "Excalidraw",
+    previewKind: "svg",
+    previewLines: ["정렬", "위계", "간결"],
+    description: "기하학적으로 정돈된 SVG식 Excalidraw 도식을 생성합니다.",
+  },
+  {
+    id: "copy-brief",
+    label: "브리프 복사",
+    emoji: "📋",
+    icon: "clipboard-copy",
+    badge: "Brief",
+    previewKind: "brief",
+    previewLines: ["원문", "요구사항", "검증"],
+    description: "현재 노트 기반 Codex 작업 브리프를 클립보드로 복사합니다.",
+  },
+];
 
 function preparePanelModal(modal: Modal, contentEl: HTMLElement): void {
   modal.modalEl.addClass("codex-excalidraw-config-modal-shell");
@@ -1942,6 +2221,12 @@ function inferCodexPhase(text: string, stream: "stdout" | "stderr"): PanelPhase 
     return "thinking";
   }
   return null;
+}
+
+function isSubmitShortcut(event: KeyboardEvent): boolean {
+  if (event.isComposing) return false;
+  const submitKey = event.key === "Enter" || event.code === "Enter" || event.code === "NumpadEnter";
+  return submitKey && (event.metaKey || event.ctrlKey);
 }
 
 function roundPanelScale(value: number): number {
