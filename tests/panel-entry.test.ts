@@ -39,6 +39,14 @@ describe("Codex drawing panel entry points", () => {
     expect(stylesSource).toContain("overflow-wrap: anywhere");
   });
 
+  it("can clear a completed chat session from the header", () => {
+    expect(pluginSource).toContain("resetChatSession");
+    expect(pluginSource).toContain("대화 세션 초기화");
+    expect(pluginSource).toContain("this.messages = []");
+    expect(pluginSource).toContain('this.currentPhase = "idle"');
+    expect(pluginSource).toContain("this.lastOutputPath = \"\"");
+  });
+
   it("keeps chat scrolling natural while preserving user-selected scroll position", () => {
     expect(pluginSource).toContain("shouldAutoScrollChat");
     expect(pluginSource).toContain("forceNextChatScroll");
@@ -195,6 +203,11 @@ describe("Codex drawing panel entry points", () => {
     expect(pluginSource).toContain("lastOutputPath");
     expect(pluginSource).toContain("결과 열기");
     expect(pluginSource).toContain("경로 복사");
+    expect(pluginSource).toContain("dismissOutputPath");
+    expect(pluginSource).toContain("결과 파일 카드 닫기");
+    expect(pluginSource).toContain("codex-excalidraw-panel-output-dismiss");
+    expect(stylesSource).toContain("codex-excalidraw-panel-output-header");
+    expect(stylesSource).toContain("codex-excalidraw-panel-output-dismiss");
     expect(stylesSource).toContain("codex-excalidraw-panel-output-path");
   });
 });

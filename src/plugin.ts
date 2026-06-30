@@ -1276,6 +1276,11 @@ class CodexExcalidrawPanelView extends ItemView {
     const header = shell.createDiv({ cls: "codex-excalidraw-panel-chat-header" });
     header.createSpan({ cls: "codex-excalidraw-panel-chat-title", text: "Codex 대화창" });
     const chatActions = header.createDiv({ cls: "codex-excalidraw-panel-chat-actions" });
+    if (this.messages.length > 0 || this.lastOutputPath || this.activityLines.length > 0 || this.currentPhase !== "idle") {
+      this.addButton(chatActions, "초기화", () => {
+        this.resetChatSession();
+      }, this.isRunning, "대화 세션 초기화");
+    }
     chatActions.createSpan({
       cls: "codex-excalidraw-panel-chat-subtitle",
       text: this.agentSubtitle(),
@@ -1376,7 +1381,19 @@ class CodexExcalidrawPanelView extends ItemView {
 
   private renderOutputEvent(chat: HTMLElement): void {
     const output = chat.createDiv({ cls: "codex-excalidraw-panel-output codex-excalidraw-panel-agent-output" });
-    output.createDiv({ cls: "codex-excalidraw-panel-agent-kicker", text: "결과 파일" });
+    const header = output.createDiv({ cls: "codex-excalidraw-panel-output-header" });
+    header.createDiv({ cls: "codex-excalidraw-panel-agent-kicker", text: "결과 파일" });
+    const dismiss = header.createEl("button", {
+      cls: "codex-excalidraw-panel-output-dismiss",
+      attr: {
+        "aria-label": "결과 파일 카드 닫기",
+        title: "결과 파일 카드 닫기",
+      },
+    });
+    setIcon(dismiss, "x");
+    dismiss.addEventListener("click", () => {
+      this.dismissOutputPath();
+    });
     output.createDiv({ cls: "codex-excalidraw-panel-output-path", text: this.lastOutputPath });
     const actions = output.createDiv({ cls: "codex-excalidraw-panel-output-actions" });
     this.addButton(actions, "결과 열기", () => {
@@ -1385,6 +1402,26 @@ class CodexExcalidrawPanelView extends ItemView {
     this.addButton(actions, "경로 복사", () => {
       void this.copyText(this.lastOutputPath, "결과 경로");
     }, this.isRunning);
+  }
+
+  private resetChatSession(): void {
+    if (this.isRunning) return;
+    this.messages = [];
+    this.statusText = "";
+    this.lastOutputPath = "";
+    this.activityLines = [];
+    this.currentPhase = "idle";
+    this.phaseDetail = "대기 중";
+    this.runningStartedAt = 0;
+    this.runningLabel = "";
+    this.forceNextChatScroll = true;
+    this.render();
+  }
+
+  private dismissOutputPath(): void {
+    this.lastOutputPath = "";
+    this.forceNextChatScroll = false;
+    this.render();
   }
 
   private agentSubtitle(): string {
@@ -1503,8 +1540,10 @@ class CodexExcalidrawPanelView extends ItemView {
     });
   }
 
-  private addButton(parent: HTMLElement, label: string, onClick: () => void, disabled = false): void {
+  private addButton(parent: HTMLElement, label: string, onClick: () => void, disabled = false, title = label): void {
     const button = parent.createEl("button", { text: label });
+    button.setAttr("aria-label", title);
+    button.setAttr("title", title);
     button.disabled = disabled;
     button.addEventListener("click", onClick);
   }
