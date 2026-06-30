@@ -1185,6 +1185,7 @@ class CodexExcalidrawPanelView extends ItemView {
   private phaseDetail = "대기 중";
   private lastShortcutSubmitAt = 0;
   private forceNextChatScroll = false;
+  private renderFrame: number | null = null;
 
   constructor(leaf: WorkspaceLeaf, private plugin: CodexExcalidrawPlugin) {
     super(leaf);
@@ -1212,10 +1213,12 @@ class CodexExcalidrawPanelView extends ItemView {
   }
 
   async onClose(): Promise<void> {
+    this.cancelScheduledRender();
     this.stopProgress();
   }
 
   private render(): void {
+    this.cancelScheduledRender();
     const { contentEl } = this;
     const shouldScrollChat = this.shouldAutoScrollChat();
     contentEl.empty();
@@ -1224,6 +1227,20 @@ class CodexExcalidrawPanelView extends ItemView {
     this.renderHeader(root);
     this.renderChat(root, shouldScrollChat);
     this.renderComposer(root);
+  }
+
+  private scheduleRender(): void {
+    if (this.renderFrame !== null) return;
+    this.renderFrame = window.requestAnimationFrame(() => {
+      this.renderFrame = null;
+      this.render();
+    });
+  }
+
+  private cancelScheduledRender(): void {
+    if (this.renderFrame === null) return;
+    window.cancelAnimationFrame(this.renderFrame);
+    this.renderFrame = null;
   }
 
   private renderHeader(root: HTMLElement): void {
@@ -1330,6 +1347,7 @@ class CodexExcalidrawPanelView extends ItemView {
     }
     if (shouldScrollChat) {
       window.requestAnimationFrame(() => {
+        if (!chat.isConnected) return;
         chat.scrollTo({
           top: chat.scrollHeight,
           behavior: this.isRunning ? "auto" : "smooth",
@@ -1364,7 +1382,7 @@ class CodexExcalidrawPanelView extends ItemView {
       .split(/\r?\n/)
       .map((line) => line.trim())
       .filter(Boolean)
-      .slice(0, 3);
+      .slice(0, 2);
     if (statusLines.length > 0) {
       const details = body.createDiv({ cls: "codex-excalidraw-panel-agent-details" });
       for (const line of statusLines) {
@@ -1378,7 +1396,7 @@ class CodexExcalidrawPanelView extends ItemView {
       fill.style.width = `${this.progressPercent()}%`;
     }
 
-    const recentLines = this.activityLines.slice(-5);
+    const recentLines = this.activityLines.slice(-4);
     if (recentLines.length > 0) {
       const activity = body.createDiv({ cls: "codex-excalidraw-panel-agent-activity" });
       for (const line of recentLines) {
@@ -1471,12 +1489,14 @@ class CodexExcalidrawPanelView extends ItemView {
   private pushActivity(text: string): void {
     const normalized = text.replace(/\s+/g, " ").trim();
     if (!normalized) return;
+    const last = this.activityLines.at(-1)?.replace(/^.*? · /, "");
+    if (last === normalized) return;
     const time = new Date().toLocaleTimeString("ko-KR", {
       hour: "2-digit",
       minute: "2-digit",
       second: "2-digit",
     });
-    this.activityLines = [...this.activityLines, `${time} · ${normalized}`].slice(-8);
+    this.activityLines = [...this.activityLines, `${time} · ${normalized}`].slice(-6);
   }
 
   private setPhase(phase: PanelPhase, detail?: string): void {
@@ -1664,7 +1684,7 @@ class CodexExcalidrawPanelView extends ItemView {
     try {
       const summary = await this.plugin.runCodexPanelActionWithCallbacks(action, this.promptValue, (chunk, stream) => {
         this.ingestCodexChunk(chunk, stream);
-        this.render();
+        this.scheduleRender();
       });
       this.stopProgress();
       this.setPhase("complete", `${actionLabel(action)} 완료`);
@@ -1710,7 +1730,7 @@ class CodexExcalidrawPanelView extends ItemView {
           this.statusText = codexStatusLine(chunk, stream) || "Codex 실행 중...";
           this.pushActivity(this.statusText);
         }
-        this.render();
+        this.scheduleRender();
       }, history);
       this.stopProgress();
       this.setPhase("complete", "Codex 응답 완료");
@@ -1743,7 +1763,7 @@ class CodexExcalidrawPanelView extends ItemView {
     this.updateProgressStatus();
     this.progressTimer = window.setInterval(() => {
       this.updateProgressStatus();
-      this.render();
+      this.scheduleRender();
     }, 5000);
     this.render();
   }
@@ -1758,9 +1778,8 @@ class CodexExcalidrawPanelView extends ItemView {
   private updateProgressStatus(): void {
     const elapsed = this.elapsedSeconds();
     this.statusText = [
-      `${this.runningLabel}... 경과 ${elapsed}s / 최대 ${this.plugin.settings.codexTimeoutSeconds}s`,
+      `${this.runningLabel} · ${elapsed}s / ${this.plugin.settings.codexTimeoutSeconds}s`,
       this.plugin.getCodexRuntimeSummary(),
-      "긴 Canvas/드로잉 생성은 Codex가 파일을 읽고 쓰는 동안 이 패널에서 대기합니다.",
     ].join("\n");
   }
 }

@@ -50,9 +50,15 @@ describe("Codex drawing panel entry points", () => {
   it("keeps chat scrolling natural while preserving user-selected scroll position", () => {
     expect(pluginSource).toContain("shouldAutoScrollChat");
     expect(pluginSource).toContain("forceNextChatScroll");
+    expect(pluginSource).toContain("scheduleRender");
+    expect(pluginSource).toContain("cancelScheduledRender");
+    expect(pluginSource).toContain("window.requestAnimationFrame");
     expect(pluginSource).toContain("chat.scrollTo");
+    expect(pluginSource).toContain("if (!chat.isConnected) return");
     expect(pluginSource).toContain("current.scrollTop + current.clientHeight >= current.scrollHeight - 96");
     expect(stylesSource).toContain("scroll-behavior: smooth");
+    expect(stylesSource).toContain("overflow-anchor: none");
+    expect(stylesSource).toContain("contain: layout paint");
   });
 
   it("exposes runtime controls and agent progress state in the chat stream", () => {
@@ -123,9 +129,11 @@ describe("Codex drawing panel entry points", () => {
 
   it("lays out panel toolbar buttons as compact single-line controls", () => {
     expect(stylesSource).toContain("grid-template-columns: repeat(3, minmax(0, 1fr))");
-    expect(stylesSource).toContain("grid-template-columns: minmax(0, 1fr) 36px");
-    expect(stylesSource).toContain("overflow-y: auto");
-    expect(stylesSource).toContain("padding: 16px 14px 56px");
+    expect(stylesSource).toContain("grid-template-columns: minmax(0, 1fr) 32px");
+    expect(stylesSource).toContain("overflow: hidden");
+    expect(stylesSource).toContain("padding: 10px 12px 42px");
+    expect(stylesSource).toContain("min-height: 74px");
+    expect(stylesSource).toContain("max-height: none");
     expect(stylesSource).toContain("flex-wrap: nowrap");
     expect(stylesSource).toContain("white-space: nowrap");
     expect(stylesSource).toContain("word-break: keep-all");
@@ -186,7 +194,8 @@ describe("Codex drawing panel entry points", () => {
   it("shows elapsed progress while Codex is running", () => {
     expect(pluginSource).toContain("startProgress");
     expect(pluginSource).toContain("updateProgressStatus");
-    expect(pluginSource).toContain("경과");
+    expect(pluginSource).toContain("elapsedSeconds");
+    expect(pluginSource).toContain("s /");
   });
 
   it("protects Markdown source notes by routing rewrite requests to a copy", () => {
