@@ -1178,6 +1178,7 @@ class CodexExcalidrawPanelView extends ItemView {
   private currentPhase: PanelPhase = "idle";
   private phaseDetail = "대기 중";
   private lastShortcutSubmitAt = 0;
+  private forceNextChatScroll = false;
 
   constructor(leaf: WorkspaceLeaf, private plugin: CodexExcalidrawPlugin) {
     super(leaf);
@@ -1210,11 +1211,12 @@ class CodexExcalidrawPanelView extends ItemView {
 
   private render(): void {
     const { contentEl } = this;
+    const shouldScrollChat = this.shouldAutoScrollChat();
     contentEl.empty();
     const root = contentEl.createDiv({ cls: "codex-excalidraw-panel" });
 
     this.renderHeader(root);
-    this.renderChat(root);
+    this.renderChat(root, shouldScrollChat);
     this.renderComposer(root);
   }
 
@@ -1265,7 +1267,7 @@ class CodexExcalidrawPanelView extends ItemView {
     return Math.min(100, Math.round((elapsed / limit) * 100));
   }
 
-  private renderChat(root: HTMLElement): void {
+  private renderChat(root: HTMLElement, shouldScrollChat: boolean): void {
     const shell = root.createDiv({
       cls: `codex-excalidraw-panel-chat-shell codex-excalidraw-panel-agent-shell ${
         this.isRunning ? "codex-excalidraw-panel-agent-shell-running" : ""
@@ -1285,8 +1287,8 @@ class CodexExcalidrawPanelView extends ItemView {
     }
 
     const chat = shell.createDiv({ cls: "codex-excalidraw-panel-chat-log codex-excalidraw-panel-agent-log" });
-    this.renderAgentEvent(chat);
     if (this.messages.length === 0) {
+      this.renderAgentEvent(chat);
       chat.createDiv({
         cls: "codex-excalidraw-panel-chat-empty",
         text: "아래 입력창에서 Codex에게 질문하거나 현재 노트·드로잉·Canvas 수정 방향을 지시하세요. 실행 상태와 응답은 이 대화 스트림에 함께 누적됩니다.",
@@ -1302,20 +1304,35 @@ class CodexExcalidrawPanelView extends ItemView {
         cls: "codex-excalidraw-panel-message-role",
         text: message.role === "user" ? "나" : "Codex",
       });
-      this.addButton(messageHead, "복사", () => {
-        void this.copyText(message.text, message.role === "user" ? "내 메시지" : "Codex 응답");
-      }, !message.text.trim());
       bubble.createEl("pre", {
         cls: "codex-excalidraw-panel-message-text",
         text: message.text || (message.role === "assistant" ? "응답 수신 중..." : ""),
       });
     }
+    if (this.messages.length > 0) {
+      this.renderAgentEvent(chat);
+    }
     if (this.lastOutputPath) {
       this.renderOutputEvent(chat);
     }
-    window.setTimeout(() => {
-      chat.scrollTop = chat.scrollHeight;
-    }, 0);
+    if (shouldScrollChat) {
+      window.requestAnimationFrame(() => {
+        chat.scrollTo({
+          top: chat.scrollHeight,
+          behavior: this.isRunning ? "auto" : "smooth",
+        });
+      });
+    }
+  }
+
+  private shouldAutoScrollChat(): boolean {
+    if (this.forceNextChatScroll) {
+      this.forceNextChatScroll = false;
+      return true;
+    }
+    const current = this.contentEl.querySelector(".codex-excalidraw-panel-chat-log");
+    if (!(current instanceof HTMLElement)) return true;
+    return current.scrollTop + current.clientHeight >= current.scrollHeight - 96;
   }
 
   private renderAgentEvent(chat: HTMLElement): void {
@@ -1429,7 +1446,7 @@ class CodexExcalidrawPanelView extends ItemView {
     if (phase) {
       this.setPhase(phase, `${phaseLabel(phase)} · ${normalized.slice(-140)}`);
     }
-    this.pushActivity(normalized.slice(-180));
+    this.pushActivity(codexStatusLine(normalized, stream) || normalized.slice(-180));
   }
 
   private renderComposer(root: HTMLElement): void {
@@ -1633,6 +1650,7 @@ class CodexExcalidrawPanelView extends ItemView {
     const assistantMessage: PanelMessage = { role: "assistant", text: "" };
     this.messages.push(assistantMessage);
     this.promptValue = "";
+    this.forceNextChatScroll = true;
     this.startProgress("Codex 대화 응답 생성 중");
 
     try {
@@ -1642,7 +1660,7 @@ class CodexExcalidrawPanelView extends ItemView {
         if (stream === "stdout") {
           assistantMessage.text = `${assistantMessage.text}${chunk}`.slice(-6000);
         } else {
-          this.statusText = chunk.trim().slice(-240) || "Codex 실행 중...";
+          this.statusText = codexStatusLine(chunk, stream) || "Codex 실행 중...";
           this.pushActivity(this.statusText);
         }
         this.render();
@@ -1673,6 +1691,7 @@ class CodexExcalidrawPanelView extends ItemView {
     this.runningLabel = label;
     this.runningStartedAt = Date.now();
     this.setPhase("preparing", `${label} 준비 중`);
+    this.forceNextChatScroll = true;
     this.pushActivity(label);
     this.updateProgressStatus();
     this.progressTimer = window.setInterval(() => {
@@ -2209,7 +2228,8 @@ function phaseLabel(phase: PanelPhase): string {
 
 function inferCodexPhase(text: string, stream: "stdout" | "stderr"): PanelPhase | null {
   const normalized = text.toLowerCase();
-  if (/(failed|error|enoent|timed out|실패|오류)/.test(normalized)) return "failed";
+  if (isRecoverableCodexWarning(normalized)) return stream === "stderr" ? "thinking" : null;
+  if (/(spawn .*enoent|enoent|timed out|exit code|codex cli failed|failed:|실패:)/.test(normalized)) return "failed";
   if (/(test|verify|verified|validation|validate|검증|확인|파싱|parse)/.test(normalized)) return "verifying";
   if (/(apply_patch|patch|write|written|edit|edited|modified|created|updated|delete|remove|rename|수정|편집|생성|저장|삭제)/.test(normalized)) {
     return "editing";
@@ -2221,6 +2241,20 @@ function inferCodexPhase(text: string, stream: "stdout" | "stderr"): PanelPhase 
     return "thinking";
   }
   return null;
+}
+
+function codexStatusLine(text: string, stream: "stdout" | "stderr"): string {
+  const normalized = text.replace(/\s+/g, " ").trim();
+  if (!normalized) return "";
+  if (isRecoverableCodexWarning(normalized.toLowerCase())) {
+    return "외부 커넥터 인증 경고가 있었지만 Codex 실행은 계속 중입니다.";
+  }
+  return stream === "stderr" ? normalized.slice(-180) : normalized.slice(-180);
+}
+
+function isRecoverableCodexWarning(normalized: string): boolean {
+  return /(invalid_token|missing or invalid access token|protected-resource|oauth|mcp)/.test(normalized)
+    && !/(spawn .*enoent|enoent|timed out|exit code|fatal|codex cli failed)/.test(normalized);
 }
 
 function isSubmitShortcut(event: KeyboardEvent): boolean {

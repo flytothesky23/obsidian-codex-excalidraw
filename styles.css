@@ -205,8 +205,7 @@
   justify-content: flex-end;
 }
 
-.codex-excalidraw-panel-chat-actions button,
-.codex-excalidraw-panel-message-head button {
+.codex-excalidraw-panel-chat-actions button {
   font-size: 11px;
   padding: 2px 6px;
 }
@@ -233,6 +232,7 @@
   min-height: 330px;
   overflow: auto;
   padding: 10px;
+  scroll-behavior: smooth;
   user-select: text;
   -webkit-user-select: text;
 }
@@ -256,7 +256,7 @@
   align-items: center;
   display: flex;
   gap: 8px;
-  justify-content: space-between;
+  justify-content: flex-start;
 }
 
 .codex-excalidraw-panel-message-user {

@@ -34,8 +34,17 @@ describe("Codex drawing panel entry points", () => {
     expect(pluginSource).toContain("전체 복사");
     expect(pluginSource).toContain("copyText");
     expect(pluginSource).toContain("chatTranscript");
+    expect(pluginSource).not.toContain('this.addButton(messageHead, "복사"');
     expect(stylesSource).toContain("user-select: text");
     expect(stylesSource).toContain("overflow-wrap: anywhere");
+  });
+
+  it("keeps chat scrolling natural while preserving user-selected scroll position", () => {
+    expect(pluginSource).toContain("shouldAutoScrollChat");
+    expect(pluginSource).toContain("forceNextChatScroll");
+    expect(pluginSource).toContain("chat.scrollTo");
+    expect(pluginSource).toContain("current.scrollTop + current.clientHeight >= current.scrollHeight - 96");
+    expect(stylesSource).toContain("scroll-behavior: smooth");
   });
 
   it("exposes runtime controls and agent progress state in the chat stream", () => {
@@ -137,6 +146,14 @@ describe("Codex drawing panel entry points", () => {
     expect(stylesSource).not.toContain("codex-excalidraw-panel-status-pill");
     expect(stylesSource).toContain("codex-excalidraw-panel-agent-progress");
     expect(stylesSource).toContain("codex-excalidraw-panel-agent-activity");
+  });
+
+  it("does not treat recoverable connector auth warnings as whole Codex failures", () => {
+    expect(pluginSource).toContain("isRecoverableCodexWarning");
+    expect(pluginSource).toContain("invalid_token");
+    expect(pluginSource).toContain("외부 커넥터 인증 경고");
+    expect(pluginSource).toContain("return stream === \"stderr\" ? \"thinking\" : null");
+    expect(pluginSource).not.toContain("/(failed|error|enoent|timed out|실패|오류)/");
   });
 
   it("uses Codexian settings as the default runtime source", () => {
