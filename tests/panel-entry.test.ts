@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 describe("Codex drawing panel entry points", () => {
   const pluginSource = readFileSync("src/plugin.ts", "utf8");
   const settingsSource = readFileSync("src/settings.ts", "utf8");
+  const stylesSource = readFileSync("styles.css", "utf8");
 
   it("opens the side panel from the visible ribbon icon", () => {
     expect(pluginSource).toContain('addRibbonIcon("panel-right-open", "Open Codex drawing panel"');
@@ -26,6 +27,23 @@ describe("Codex drawing panel entry points", () => {
     expect(pluginSource).toContain("대화 보내기");
     expect(pluginSource).toContain("Codexian 열기");
     expect(pluginSource).toContain("getCodexRuntimeSummary");
+  });
+
+  it("makes chat output copyable and selectable", () => {
+    expect(pluginSource).toContain("전체 복사");
+    expect(pluginSource).toContain("copyText");
+    expect(pluginSource).toContain("chatTranscript");
+    expect(stylesSource).toContain("user-select: text");
+    expect(stylesSource).toContain("overflow-wrap: anywhere");
+  });
+
+  it("exposes runtime controls and progress state in the panel", () => {
+    expect(pluginSource).toContain("작업 상태");
+    expect(pluginSource).toContain("progressPercent");
+    expect(pluginSource).toContain("런타임");
+    expect(pluginSource).toContain("모델");
+    expect(pluginSource).toContain("추론");
+    expect(pluginSource).toContain("제한");
   });
 
   it("uses Codexian settings as the default runtime source", () => {

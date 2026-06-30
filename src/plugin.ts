@@ -10,7 +10,9 @@ import {
   TFolder,
   WorkspaceLeaf,
 } from "obsidian";
-import { buildCanvas } from "./canvas";
+import { lstatSync } from "fs";
+import { join } from "path";
+import { assertReadableCanvas, buildCanvas, parseAndValidateCanvas } from "./canvas";
 import { buildCanvasBrief } from "./canvas-brief";
 import { buildCodexBrief } from "./codex-brief";
 import { runCodexExec } from "./codex-cli";
@@ -271,7 +273,9 @@ export default class CodexExcalidrawPlugin extends Plugin {
       title,
       sourcePaths: contexts.map((context) => context.path),
     });
-    const path = await this.writeDrawing(blankMarkdown, label);
+    const outputFolder = this.getCodexWritableOutputFolder();
+    this.noticeWhenUsingSafeOutputFolder(outputFolder);
+    const path = await this.writeDrawing(blankMarkdown, label, outputFolder);
 
     new Notice(`${actionLabel(action)} target created. Codex CLI is reading ${contexts.length} source note(s).`, 7000);
     const summary = await this.refineWithCodex(contexts, path, instruction, action);
@@ -289,6 +293,7 @@ export default class CodexExcalidrawPlugin extends Plugin {
   async runCodexChat(
     instruction: string,
     onUpdate?: (chunk: string, stream: "stdout" | "stderr") => void,
+    previousMessages: Array<{ role: "user" | "assistant"; text: string }> = [],
   ): Promise<string> {
     const adapter = this.app.vault.adapter;
     if (!(adapter instanceof FileSystemAdapter)) {
@@ -320,6 +325,15 @@ export default class CodexExcalidrawPlugin extends Plugin {
       "# Active File Content",
       "",
       activeContent || "No active file content loaded.",
+      "",
+      "# Recent Side Panel Conversation",
+      "",
+      previousMessages.length
+        ? previousMessages
+          .slice(-8)
+          .map((message) => `${message.role === "user" ? "User" : "Codex"}: ${truncate(message.text, 1200)}`)
+          .join("\n\n")
+        : "No previous side-panel messages.",
       "",
       "# User Message",
       "",
@@ -383,7 +397,10 @@ export default class CodexExcalidrawPlugin extends Plugin {
     const contexts = await this.readNoteContexts(capped, !runCodex);
     const title = `${label} Obsidian Canvas`;
     const result = buildCanvas(contexts, title);
-    const path = await this.writeCanvas(result.json, label);
+    const outputFolder = runCodex ? this.getCodexWritableOutputFolder() : this.settings.outputFolder;
+    if (runCodex) this.noticeWhenUsingSafeOutputFolder(outputFolder);
+    const path = await this.writeCanvas(result.json, label, outputFolder);
+    await this.validateCanvasTarget(path);
     new Notice(`Created ${path} with ${result.nodeCount} canvas nodes and ${result.edgeCount} edges.`, 7000);
 
     if (runCodex) {
@@ -415,7 +432,9 @@ export default class CodexExcalidrawPlugin extends Plugin {
         title,
         sourcePaths: contexts.map((context) => context.path),
       });
-      path = await this.writeDrawing(blankMarkdown, label);
+      const outputFolder = this.getCodexWritableOutputFolder();
+      this.noticeWhenUsingSafeOutputFolder(outputFolder);
+      path = await this.writeDrawing(blankMarkdown, label, outputFolder);
       new Notice(
         `Created semantic Codex target ${path}. Codex CLI is reading ${contexts.length} source note(s).`,
         7000,
@@ -454,7 +473,7 @@ export default class CodexExcalidrawPlugin extends Plugin {
   private async copyCodexBrief(active: TFile): Promise<void> {
     const files = await this.expandLinkedNotes(active);
     const contexts = await this.readNoteContexts(files);
-    const targetPath = await this.nextDrawingPath(active.basename);
+    const targetPath = await this.nextDrawingPath(active.basename, this.getCodexWritableOutputFolder());
     const brief = buildCodexBrief(contexts, targetPath, this.codexBriefOptions());
     await navigator.clipboard.writeText(brief);
     new Notice(`Copied Codex drawing brief for ${contexts.length} note(s).`);
@@ -560,14 +579,18 @@ export default class CodexExcalidrawPlugin extends Plugin {
       "",
       "Read the source Markdown files and target canvas from disk first.",
       `Edit only this target canvas file: ${targetPath}`,
+      "Do not create another `.canvas` file in the vault root or any fallback folder. If the target path cannot be written, report failure instead of creating an alternate file.",
       "Keep it as valid Obsidian JSON Canvas. Do not generate Excalidraw Markdown for this action.",
+      "Remove or replace placeholder nodes. Every text node must contain readable Korean content anchored to the source notes.",
     ].join("\n");
 
     new Notice("Codex CLI is composing an Obsidian Canvas JSON file...");
     const result = await this.runCodex(prompt);
+    const stats = await this.validateCanvasTarget(targetPath);
     const summary = summarizeCodexResult(result.stdout || result.stderr);
-    new Notice(`Codex CLI finished. ${summary || "Canvas refined."}`, 10000);
-    return summary;
+    const verified = `검증: 텍스트 ${stats.textNodeCount}개, 원문 ${stats.fileNodeCount}개, 연결 ${stats.edgeCount}개`;
+    new Notice(`Codex CLI finished. ${summary || "Canvas refined."} ${verified}`, 10000);
+    return [summary, verified].filter(Boolean).join("\n");
   }
 
   private async reviseActiveCanvasWithCodex(targetPath: string, instruction: string): Promise<string> {
@@ -591,19 +614,23 @@ export default class CodexExcalidrawPlugin extends Plugin {
       "Read the target canvas file first.",
       "Read any `file` node Markdown paths that are relevant before revising.",
       "Edit only the target `.canvas` file.",
+      "Do not create another `.canvas` file. If the target is not writable, report failure instead of creating an alternate file.",
       "Keep valid JSON Canvas with top-level `nodes` and `edges` arrays.",
       "Every node and edge id must be unique 16-character lowercase hex.",
       "Every edge must reference existing nodes.",
       "Use Obsidian Canvas strengths: file nodes, concept text nodes, groups, colors, and readable auto-layout.",
+      "Remove placeholder nodes and make every text node meaningful Korean reading content.",
       "Do not create SVG, HTML, PNG, or Excalidraw Markdown for this action.",
       "After editing, report the structure changes.",
     ].join("\n");
 
     new Notice("Codex CLI is revising the active Obsidian Canvas...");
     const result = await this.runCodex(prompt);
+    const stats = await this.validateCanvasTarget(targetPath);
     const summary = summarizeCodexResult(result.stdout || result.stderr);
-    new Notice(`Codex CLI finished. ${summary || "Canvas revised."}`, 10000);
-    return summary;
+    const verified = `검증: 텍스트 ${stats.textNodeCount}개, 원문 ${stats.fileNodeCount}개, 연결 ${stats.edgeCount}개`;
+    new Notice(`Codex CLI finished. ${summary || "Canvas revised."} ${verified}`, 10000);
+    return [summary, verified].filter(Boolean).join("\n");
   }
 
   private codexBriefOptions() {
@@ -659,6 +686,12 @@ export default class CodexExcalidrawPlugin extends Plugin {
   private notifyCodexError(error: unknown): void {
     const message = error instanceof Error ? error.message : String(error);
     new Notice(`Codex CLI failed: ${message.slice(0, 220)}`, 12000);
+  }
+
+  private async validateCanvasTarget(path: string): Promise<{ textNodeCount: number; fileNodeCount: number; edgeCount: number }> {
+    const raw = await this.app.vault.adapter.read(path);
+    const canvas = parseAndValidateCanvas(raw);
+    return assertReadableCanvas(canvas);
   }
 
   private async readNoteContexts(files: TFile[], truncateContent = true): Promise<NoteContext[]> {
@@ -725,22 +758,22 @@ export default class CodexExcalidrawPlugin extends Plugin {
     return [...seen.values()];
   }
 
-  private async writeDrawing(markdown: string, label: string): Promise<string> {
-    const path = await this.nextDrawingPath(label);
-    await this.ensureFolder(this.settings.outputFolder);
+  private async writeDrawing(markdown: string, label: string, folder = this.settings.outputFolder): Promise<string> {
+    const path = await this.nextDrawingPath(label, folder);
+    await this.ensureFolder(folder);
     await this.app.vault.create(path, markdown);
     return path;
   }
 
-  private async writeCanvas(json: string, label: string): Promise<string> {
-    const path = await this.nextCanvasPath(label);
-    await this.ensureFolder(this.settings.outputFolder);
+  private async writeCanvas(json: string, label: string, folder = this.settings.outputFolder): Promise<string> {
+    const path = await this.nextCanvasPath(label, folder);
+    await this.ensureFolder(folder);
     await this.app.vault.create(path, json);
     return path;
   }
 
-  private async nextDrawingPath(label: string): Promise<string> {
-    const folder = normalizePath(this.settings.outputFolder);
+  private async nextDrawingPath(label: string, outputFolder = this.settings.outputFolder): Promise<string> {
+    const folder = normalizePath(outputFolder);
     const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "");
     const cleanLabel = sanitizeFileName(label || "Codex Map");
     let path = normalizePath(`${folder}/${cleanLabel} ${stamp}.excalidraw.md`);
@@ -752,8 +785,8 @@ export default class CodexExcalidrawPlugin extends Plugin {
     return path;
   }
 
-  private async nextCanvasPath(label: string): Promise<string> {
-    const folder = normalizePath(this.settings.outputFolder);
+  private async nextCanvasPath(label: string, outputFolder = this.settings.outputFolder): Promise<string> {
+    const folder = normalizePath(outputFolder);
     const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "");
     const cleanLabel = sanitizeFileName(label || "Codex Canvas");
     let path = normalizePath(`${folder}/${cleanLabel} ${stamp}.canvas`);
@@ -763,6 +796,38 @@ export default class CodexExcalidrawPlugin extends Plugin {
       counter += 1;
     }
     return path;
+  }
+
+  private getCodexWritableOutputFolder(): string {
+    const configured = normalizePath(this.settings.outputFolder || DEFAULT_SETTINGS.outputFolder);
+    if (this.isSymlinkedVaultPath(configured)) return "Codex Maps";
+    return configured;
+  }
+
+  private noticeWhenUsingSafeOutputFolder(folder: string): void {
+    const configured = normalizePath(this.settings.outputFolder || DEFAULT_SETTINGS.outputFolder);
+    if (folder !== configured) {
+      new Notice(`Codex 작업 대상은 symlink 출력 폴더를 피해 ${folder}에 생성합니다.`, 9000);
+    }
+  }
+
+  private isSymlinkedVaultPath(relativePath: string): boolean {
+    const adapter = this.app.vault.adapter;
+    if (!(adapter instanceof FileSystemAdapter)) return false;
+    const parts = normalizePath(relativePath).split("/").filter(Boolean);
+    if (parts.length === 0) return false;
+
+    let current = adapter.getBasePath();
+    for (const part of parts) {
+      current = join(current, part);
+      try {
+        const stat = lstatSync(current);
+        if (stat.isSymbolicLink()) return true;
+      } catch {
+        return false;
+      }
+    }
+    return false;
   }
 
   private async ensureFolder(folderPath: string): Promise<void> {
@@ -912,6 +977,8 @@ class CodexExcalidrawPanelView extends ItemView {
       text: this.plugin.getCodexRuntimeSummary(),
     });
 
+    this.renderStatus(root);
+    this.renderControls(root);
     this.renderChat(root);
     this.renderComposer(root);
 
@@ -926,8 +993,6 @@ class CodexExcalidrawPanelView extends ItemView {
         this.render();
       });
     }
-
-    this.renderControls(root);
 
     const actions = root.createDiv({ cls: "codex-excalidraw-panel-actions" });
     actions.createDiv({ cls: "codex-excalidraw-panel-section-title", text: "드로잉 / Canvas 작업" });
@@ -953,24 +1018,47 @@ class CodexExcalidrawPanelView extends ItemView {
       void this.plugin.copyCurrentCodexBrief();
     }, this.isRunning);
 
-    if (this.statusText) {
-      root.createDiv({ cls: "codex-excalidraw-panel-status", text: this.statusText });
-    }
-
     root.createEl("p", {
       cls: "codex-excalidraw-panel-note",
       text: "Codexian 설정을 우선 사용합니다. 대화는 현재 노트를 맥락으로 읽고, 명시적으로 수정 요청을 받은 경우에만 현재 드로잉·Canvas·노트를 편집합니다.",
     });
   }
 
+  private renderStatus(root: HTMLElement): void {
+    const status = root.createDiv({
+      cls: `codex-excalidraw-panel-status codex-excalidraw-panel-status-${this.isRunning ? "running" : "idle"}`,
+    });
+    status.createDiv({ cls: "codex-excalidraw-panel-section-title", text: "작업 상태" });
+    status.createDiv({
+      cls: "codex-excalidraw-panel-status-main",
+      text: this.statusText || "대기 중",
+    });
+    const progress = status.createDiv({ cls: "codex-excalidraw-panel-progress" });
+    const fill = progress.createDiv({ cls: "codex-excalidraw-panel-progress-fill" });
+    fill.style.width = `${this.progressPercent()}%`;
+  }
+
+  private progressPercent(): number {
+    if (!this.isRunning || this.runningStartedAt <= 0) return 0;
+    const elapsed = Math.max(0, Date.now() - this.runningStartedAt);
+    const limit = Math.max(1, this.plugin.settings.codexTimeoutSeconds * 1000);
+    return Math.min(100, Math.round((elapsed / limit) * 100));
+  }
+
   private renderChat(root: HTMLElement): void {
     const shell = root.createDiv({ cls: "codex-excalidraw-panel-chat-shell" });
     const header = shell.createDiv({ cls: "codex-excalidraw-panel-chat-header" });
     header.createSpan({ cls: "codex-excalidraw-panel-chat-title", text: "Codex 대화창" });
-    header.createSpan({
+    const chatActions = header.createDiv({ cls: "codex-excalidraw-panel-chat-actions" });
+    chatActions.createSpan({
       cls: "codex-excalidraw-panel-chat-subtitle",
       text: this.isRunning ? "실행 중" : "현재 노트 맥락",
     });
+    if (this.messages.length > 0) {
+      this.addButton(chatActions, "전체 복사", () => {
+        void this.copyText(this.chatTranscript(), "전체 대화");
+      }, this.isRunning);
+    }
 
     const chat = shell.createDiv({ cls: "codex-excalidraw-panel-chat-log" });
     if (this.messages.length === 0) {
@@ -985,15 +1073,33 @@ class CodexExcalidrawPanelView extends ItemView {
       const bubble = chat.createDiv({
         cls: `codex-excalidraw-panel-message codex-excalidraw-panel-message-${message.role}`,
       });
-      bubble.createDiv({
+      const messageHead = bubble.createDiv({ cls: "codex-excalidraw-panel-message-head" });
+      messageHead.createDiv({
         cls: "codex-excalidraw-panel-message-role",
         text: message.role === "user" ? "나" : "Codex",
       });
-      bubble.createDiv({
+      this.addButton(messageHead, "복사", () => {
+        void this.copyText(message.text, message.role === "user" ? "내 메시지" : "Codex 응답");
+      }, !message.text.trim());
+      bubble.createEl("pre", {
         cls: "codex-excalidraw-panel-message-text",
         text: message.text || (message.role === "assistant" ? "응답 수신 중..." : ""),
       });
     }
+  }
+
+  private chatTranscript(): string {
+    return this.messages
+      .map((message) => `${message.role === "user" ? "나" : "Codex"}:\n${message.text}`)
+      .join("\n\n");
+  }
+
+  private async copyText(text: string, label: string): Promise<void> {
+    const value = text.trim();
+    if (!value) return;
+    await navigator.clipboard.writeText(value);
+    this.statusText = `${label} 복사됨`;
+    this.render();
   }
 
   private renderComposer(root: HTMLElement): void {
@@ -1007,6 +1113,12 @@ class CodexExcalidrawPanelView extends ItemView {
     prompt.disabled = this.isRunning;
     prompt.addEventListener("input", () => {
       this.promptValue = prompt.value;
+    });
+    prompt.addEventListener("keydown", (event) => {
+      if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+        event.preventDefault();
+        void this.runChat();
+      }
     });
 
     const composerActions = composer.createDiv({ cls: "codex-excalidraw-panel-composer-actions" });
@@ -1026,6 +1138,65 @@ class CodexExcalidrawPanelView extends ItemView {
 
   private renderControls(root: HTMLElement): void {
     const controls = root.createDiv({ cls: "codex-excalidraw-panel-controls" });
+    controls.createDiv({ cls: "codex-excalidraw-panel-section-title", text: "실행 / 스타일" });
+
+    const sourceRow = controls.createDiv({ cls: "codex-excalidraw-panel-control-row" });
+    sourceRow.createSpan({ text: "런타임" });
+    const sourceSelect = sourceRow.createEl("select");
+    addOption(sourceSelect, "codexian", "Codexian");
+    addOption(sourceSelect, "custom", "Custom");
+    sourceSelect.value = this.plugin.settings.codexSettingsSource;
+    sourceSelect.addEventListener("change", () => {
+      this.plugin.settings.codexSettingsSource = sourceSelect.value === "custom" ? "custom" : "codexian";
+      void this.plugin.saveSettings().then(() => this.render());
+    });
+    sourceRow.createSpan({ cls: "codex-excalidraw-panel-scale-value", text: "" });
+
+    const modelRow = controls.createDiv({ cls: "codex-excalidraw-panel-control-row" });
+    modelRow.createSpan({ text: "모델" });
+    const modelInput = modelRow.createEl("input");
+    modelInput.type = "text";
+    modelInput.value = this.plugin.settings.codexModel;
+    modelInput.placeholder = "gpt-5.5";
+    modelInput.addEventListener("change", () => {
+      this.plugin.settings.codexSettingsSource = "custom";
+      this.plugin.settings.codexModel = modelInput.value.trim() || DEFAULT_SETTINGS.codexModel;
+      this.statusText = "모델 설정 변경: Custom runtime 사용";
+      void this.plugin.saveSettings().then(() => this.render());
+    });
+    modelRow.createSpan({ cls: "codex-excalidraw-panel-scale-value", text: "" });
+
+    const effortRow = controls.createDiv({ cls: "codex-excalidraw-panel-control-row" });
+    effortRow.createSpan({ text: "추론" });
+    const effortSelect = effortRow.createEl("select");
+    for (const effort of ["low", "medium", "high", "xhigh"]) addOption(effortSelect, effort, effort);
+    effortSelect.value = this.plugin.settings.codexReasoningEffort;
+    effortSelect.addEventListener("change", () => {
+      this.plugin.settings.codexSettingsSource = "custom";
+      this.plugin.settings.codexReasoningEffort = effortSelect.value as typeof this.plugin.settings.codexReasoningEffort;
+      this.statusText = "추론 설정 변경: Custom runtime 사용";
+      void this.plugin.saveSettings().then(() => this.render());
+    });
+    effortRow.createSpan({ cls: "codex-excalidraw-panel-scale-value", text: "" });
+
+    const timeoutRow = controls.createDiv({ cls: "codex-excalidraw-panel-control-row" });
+    timeoutRow.createSpan({ text: "제한" });
+    const timeoutInput = timeoutRow.createEl("input");
+    timeoutInput.type = "range";
+    timeoutInput.min = "60";
+    timeoutInput.max = "1200";
+    timeoutInput.step = "60";
+    timeoutInput.value = String(this.plugin.settings.codexTimeoutSeconds);
+    const timeoutValue = timeoutRow.createSpan({
+      cls: "codex-excalidraw-panel-scale-value",
+      text: `${this.plugin.settings.codexTimeoutSeconds}s`,
+    });
+    timeoutInput.addEventListener("input", () => {
+      const nextTimeout = Number.parseInt(timeoutInput.value, 10) || DEFAULT_SETTINGS.codexTimeoutSeconds;
+      this.plugin.settings.codexTimeoutSeconds = nextTimeout;
+      timeoutValue.setText(`${nextTimeout}s`);
+      void this.plugin.saveSettings();
+    });
 
     const themeRow = controls.createDiv({ cls: "codex-excalidraw-panel-control-row" });
     themeRow.createSpan({ text: "테마" });
@@ -1105,6 +1276,7 @@ class CodexExcalidrawPanelView extends ItemView {
     this.startProgress("Codex 대화 응답 생성 중");
 
     try {
+      const history = this.messages.slice(0, -2);
       const finalText = await this.plugin.runCodexChat(message, (chunk, stream) => {
         if (stream === "stdout") {
           assistantMessage.text = `${assistantMessage.text}${chunk}`.slice(-6000);
@@ -1112,7 +1284,7 @@ class CodexExcalidrawPanelView extends ItemView {
           this.statusText = chunk.trim().slice(-240) || "Codex 실행 중...";
         }
         this.render();
-      });
+      }, history);
       this.stopProgress();
       assistantMessage.text = finalText;
       this.statusText = "Codex 응답 완료";

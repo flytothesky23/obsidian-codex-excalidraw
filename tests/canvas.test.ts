@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildCanvas, parseAndValidateCanvas } from "../src/canvas";
+import { assertReadableCanvas, buildCanvas, parseAndValidateCanvas } from "../src/canvas";
 import { buildCanvasBrief } from "../src/canvas-brief";
 import { buildNoteContext } from "../src/markdown";
 
@@ -45,6 +45,38 @@ describe("Obsidian JSON Canvas generation", () => {
     expect(parsed.edges.every((edge) => nodeIds.has(edge.fromNode) && nodeIds.has(edge.toNode))).toBe(true);
   });
 
+  it("builds a multi-note canvas with readable synthesis instead of file-only placeholders", () => {
+    const result = buildCanvas(
+      [
+        buildNoteContext({
+          path: "Reports/W25.md",
+          content: [
+            "# W25",
+            "- PSBall 매출 77,758,995원, 판매량 1,218.09T.",
+            "- 검증용 자료라 공식 마감 대사 후 판단한다.",
+            "- W26 회복 신호 확인 필요.",
+          ].join("\n"),
+        }),
+        buildNoteContext({
+          path: "Reports/W24.md",
+          content: [
+            "# W24",
+            "- 직전 기준선과 전주 대비를 비교한다.",
+            "- 고객군별 재주문 여부를 확인한다.",
+          ].join("\n"),
+        }),
+      ],
+      "W25 Multi Canvas",
+    );
+    const parsed = parseAndValidateCanvas(result.json);
+    const stats = assertReadableCanvas(parsed);
+
+    expect(stats.textNodeCount).toBeGreaterThanOrEqual(4);
+    expect(parsed.nodes.some((node) => node.type === "text" && node.text.includes("잠정 판단"))).toBe(true);
+    expect(parsed.nodes.some((node) => node.type === "text" && node.text.includes("다음에 확인할 것"))).toBe(true);
+    expect(parsed.nodes.filter((node) => node.type === "file")).toHaveLength(2);
+  });
+
   it("briefs Codex to edit Canvas JSON instead of Excalidraw", () => {
     const brief = buildCanvasBrief(
       [buildNoteContext({ path: "Reports/W25.md", content: "# W25\n본문" })],
@@ -54,6 +86,7 @@ describe("Obsidian JSON Canvas generation", () => {
     expect(brief).toContain("Target canvas");
     expect(brief).toContain("valid JSON Canvas");
     expect(brief).toContain("Do not create Excalidraw Markdown");
+    expect(brief).toContain("Do not create a second `.canvas` file anywhere else");
     expect(brief).toContain("Reports/W25.md");
   });
 });

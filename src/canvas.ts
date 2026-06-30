@@ -62,6 +62,26 @@ export function parseAndValidateCanvas(json: string): JsonCanvas {
   return canvas;
 }
 
+export function assertReadableCanvas(canvas: JsonCanvas): { textNodeCount: number; fileNodeCount: number; edgeCount: number } {
+  const textNodes = canvas.nodes.filter((node): node is JsonCanvasTextNode => node.type === "text");
+  const fileNodes = canvas.nodes.filter((node): node is JsonCanvasFileNode => node.type === "file");
+  const meaningfulTextNodes = textNodes.filter((node) => node.text.replace(/\s+/g, "").length >= 20);
+  if (meaningfulTextNodes.length < 4) {
+    throw new Error(`Canvas is valid JSON but too sparse: only ${meaningfulTextNodes.length} meaningful text node(s).`);
+  }
+  if (fileNodes.length === 0) {
+    throw new Error("Canvas must keep at least one source file node so the original note remains openable.");
+  }
+  if (canvas.edges.length === 0) {
+    throw new Error("Canvas must contain edges that explain how source, claims, evidence, and next checks connect.");
+  }
+  return {
+    textNodeCount: meaningfulTextNodes.length,
+    fileNodeCount: fileNodes.length,
+    edgeCount: canvas.edges.length,
+  };
+}
+
 function buildSingleNoteCanvas(note: NoteContext | undefined, title: string): JsonCanvas {
   const safeNote = note ?? {
     path: "Untitled.md",
@@ -136,29 +156,96 @@ function buildSingleNoteCanvas(note: NoteContext | undefined, title: string): Js
 }
 
 function buildMultiNoteCanvas(notes: NoteContext[], title: string): JsonCanvas {
+  const focusNotes = notes.slice(0, Math.min(4, notes.length));
+  const evidenceHeight = Math.max(820, 120 + focusNotes.length * 200);
   const nodes: JsonCanvasNode[] = [
-    groupNode("group-main", -80, -80, 1940, 980 + Math.ceil(notes.length / 3) * 320, "Codex-ready Obsidian Canvas", "4"),
+    groupNode("group-source-lane", -760, -120, 540, evidenceHeight, "열어볼 원문", "5"),
+    groupNode("group-thinking-lane", -160, -120, 680, evidenceHeight, "판단 축", "6"),
+    groupNode("group-evidence-lane", 600, -120, 760, evidenceHeight, "근거와 검증", "4"),
+    groupNode("group-action-lane", -160, evidenceHeight + 40, 1520, 230, "다음 작업", "2"),
     textNode(
-      "center",
-      0,
-      0,
+      "synthesis-title",
+      -120,
+      -40,
       620,
-      220,
-      `# ${truncate(title, 60)}\n\n${notes.length}개 노트의 공통 맥락, 연결, 질문을 Canvas JSON으로 정리합니다.`,
+      140,
+      `# ${truncate(title, 58)}\n\n${notes.length}개 노트를 원문-질문-판단-근거-검증 흐름으로 묶은 작업 Canvas입니다.`,
       "6",
     ),
+    textNode(
+      "synthesis-question",
+      -120,
+      140,
+      620,
+      130,
+      `## 핵심 질문\n${mainQuestion(notes[0])}`,
+      "3",
+    ),
+    textNode(
+      "synthesis-judgment",
+      -120,
+      310,
+      620,
+      210,
+      `## 잠정 판단\n${synthesisJudgment(notes)}`,
+      "4",
+    ),
+    textNode(
+      "synthesis-caveat",
+      -120,
+      560,
+      620,
+      160,
+      `## 아직 단정 금지\n${synthesisRisks(notes)}`,
+      "1",
+    ),
+    textNode(
+      "synthesis-next",
+      -120,
+      evidenceHeight + 100,
+      1440,
+      130,
+      `## 다음에 확인할 것\n${synthesisNextChecks(notes)}`,
+      "2",
+    ),
   ];
-  const edges: JsonCanvasEdge[] = [];
+  const edges: JsonCanvasEdge[] = [
+    edge("title-question", "synthesis-title", "synthesis-question", "bottom", "top", "focus"),
+    edge("question-judgment", "synthesis-question", "synthesis-judgment", "bottom", "top", "answer"),
+    edge("judgment-caveat", "synthesis-judgment", "synthesis-caveat", "bottom", "top", "limit"),
+    edge("caveat-next", "synthesis-caveat", "synthesis-next", "bottom", "top", "verify"),
+  ];
 
-  notes.slice(0, 18).forEach((note, index) => {
-    const col = index % 3;
-    const row = Math.floor(index / 3);
-    const x = 760 + col * 360;
-    const y = row * 320;
-    const id = `note-${index}`;
-    nodes.push(fileNode(id, x, y, 300, 220, note.path, colorForIndex(index)));
-    edges.push(edge(`center-${index}`, "center", id, "right", "left", "note"));
+  focusNotes.forEach((note, index) => {
+    const y = -30 + index * 190;
+    const sourceKey = `source-file-${index}`;
+    const evidenceKey = `evidence-card-${index}`;
+    nodes.push(fileNode(sourceKey, -720, y, 460, 145, note.path, colorForIndex(index)));
+    nodes.push(textNode(
+      evidenceKey,
+      650,
+      y,
+      650,
+      165,
+      noteEvidenceCard(note, index),
+      colorForIndex(index + 1),
+    ));
+    edges.push(edge(`source-evidence-${index}`, sourceKey, evidenceKey, "right", "left", "원문"));
+    edges.push(edge(`evidence-judgment-${index}`, evidenceKey, "synthesis-judgment", "left", "right", "근거"));
   });
+
+  if (notes.length > focusNotes.length) {
+    nodes.push(textNode(
+      "source-overflow",
+      -720,
+      -30 + focusNotes.length * 190,
+      460,
+      130,
+      `## 추가 원문\n외 ${notes.length - focusNotes.length}개 노트는 현재 Canvas의 판단 축을 보강하는 후보입니다. 필요한 경우 파일 노드를 추가로 펼쳐 검증합니다.`,
+      "5",
+    ));
+    edges.push(edge("overflow-next", "source-overflow", "synthesis-next", "right", "left", "expand"));
+  }
 
   return { nodes, edges };
 }
@@ -283,6 +370,55 @@ function nextBullets(note: NoteContext): string {
     .slice(0, 4)
     .map((line) => `- ${truncate(line, 100)}`);
   return (questions.length ? questions : ["- 원문을 다시 읽고 다음 판단 질문을 3개로 좁히기"]).join("\n");
+}
+
+function synthesisJudgment(notes: NoteContext[]): string {
+  const summaryBullets = notes
+    .map((note) => note.summary)
+    .filter(Boolean)
+    .slice(0, 3)
+    .map((summary) => `- ${truncate(summary, 110)}`);
+  if (summaryBullets.length) return summaryBullets.join("\n");
+  return `- ${truncate(notes[0]?.basename ?? "첫 노트", 40)}를 기준으로 다른 노트가 보강하거나 반박하는 판단을 분리한다.`;
+}
+
+function synthesisRisks(notes: NoteContext[]): string {
+  const riskLines = uniqueLines(
+    notes.flatMap((note) => riskBullets(note).split("\n")),
+  ).slice(0, 4);
+  return (riskLines.length ? riskLines : ["- 원문 확인 전 결론을 고정하지 않기"]).join("\n");
+}
+
+function synthesisNextChecks(notes: NoteContext[]): string {
+  const nextLines = uniqueLines(
+    notes.flatMap((note) => nextBullets(note).split("\n")),
+  ).slice(0, 5);
+  return (nextLines.length ? nextLines : ["- 원문 파일을 열어 핵심 수치와 판단 문장을 다시 대조하기"]).join("\n");
+}
+
+function noteEvidenceCard(note: NoteContext, index: number): string {
+  const heading = note.headings[0]?.heading || note.basename;
+  const evidence = evidenceBullets(note)
+    .split("\n")
+    .slice(0, 3)
+    .join("\n");
+  return [
+    `## 근거 ${index + 1}: ${truncate(heading, 42)}`,
+    evidence,
+    note.tags.length ? `- 태그: ${note.tags.slice(0, 4).join(", ")}` : "",
+  ].filter(Boolean).join("\n");
+}
+
+function uniqueLines(lines: string[]): string[] {
+  const seen = new Set<string>();
+  const output: string[] = [];
+  for (const line of lines) {
+    const normalized = line.trim();
+    if (!normalized || seen.has(normalized)) continue;
+    seen.add(normalized);
+    output.push(normalized);
+  }
+  return output;
 }
 
 function colorForIndex(index: number): string {
