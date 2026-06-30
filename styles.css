@@ -63,10 +63,86 @@
   padding: 12px;
 }
 
+.codex-excalidraw-panel-headline {
+  align-items: center;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) 78px;
+  min-width: 0;
+}
+
 .codex-excalidraw-panel-identity {
   display: grid;
   gap: 7px;
   min-width: 0;
+}
+
+.codex-excalidraw-panel-illustration {
+  align-items: center;
+  background:
+    radial-gradient(circle at 72% 16%, rgba(var(--interactive-accent-rgb), 0.18), transparent 28px),
+    var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 14px;
+  display: grid;
+  height: 72px;
+  justify-content: center;
+  overflow: hidden;
+  width: 78px;
+}
+
+.codex-excalidraw-panel-illustration-svg {
+  display: block;
+  height: 72px;
+  width: 96px;
+}
+
+.panel-illustration-paper {
+  fill: var(--background-secondary);
+  stroke: var(--background-modifier-border);
+  stroke-width: 2;
+}
+
+.panel-illustration-note {
+  fill: rgba(var(--interactive-accent-rgb), 0.13);
+  stroke: var(--interactive-accent);
+  stroke-width: 2;
+}
+
+.panel-illustration-line,
+.panel-illustration-connector {
+  fill: none;
+  stroke: var(--text-muted);
+  stroke-linecap: round;
+  stroke-width: 3;
+}
+
+.panel-illustration-line-soft {
+  opacity: 0.58;
+}
+
+.panel-illustration-node {
+  fill: var(--background-primary);
+  stroke: var(--interactive-accent);
+  stroke-width: 2;
+}
+
+.panel-illustration-node-alt {
+  stroke: var(--color-orange);
+}
+
+.panel-illustration-pen {
+  fill: rgba(214, 134, 36, 0.18);
+  stroke: var(--color-orange);
+  stroke-linejoin: round;
+  stroke-width: 2.5;
+}
+
+.panel-illustration-spark {
+  fill: rgba(var(--interactive-accent-rgb), 0.22);
+  stroke: var(--interactive-accent);
+  stroke-linejoin: round;
+  stroke-width: 2;
 }
 
 .codex-excalidraw-panel-current {
@@ -574,8 +650,8 @@
 
 .codex-excalidraw-config-modal-shell.modal {
   max-height: min(760px, calc(100vh - 64px));
-  max-width: min(920px, calc(100vw - 48px));
-  width: min(920px, calc(100vw - 48px));
+  max-width: min(1080px, calc(100vw - 48px));
+  width: min(1080px, calc(100vw - 48px));
 }
 
 .codex-excalidraw-config-modal {
@@ -657,6 +733,108 @@
   line-height: 1.5;
   margin: 6px 0 0;
   max-width: 72ch;
+}
+
+.codex-excalidraw-runtime-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.codex-excalidraw-runtime-card {
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 16px;
+  display: grid;
+  gap: 10px;
+  min-height: 166px;
+  min-width: 0;
+  padding: 14px;
+}
+
+.codex-excalidraw-runtime-card:focus-within {
+  border-color: var(--interactive-accent);
+  box-shadow: 0 0 0 2px rgba(var(--interactive-accent-rgb), 0.13);
+}
+
+.codex-excalidraw-runtime-card-head {
+  align-items: center;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 30px minmax(0, 1fr);
+}
+
+.codex-excalidraw-runtime-card-icon {
+  align-items: center;
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 10px;
+  color: var(--interactive-accent);
+  display: inline-flex;
+  height: 30px;
+  justify-content: center;
+  width: 30px;
+}
+
+.codex-excalidraw-runtime-card-icon svg {
+  height: 16px;
+  width: 16px;
+}
+
+.codex-excalidraw-runtime-card-title {
+  color: var(--text-normal);
+  font-size: 14px;
+  font-weight: 760;
+  line-height: 1.2;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.codex-excalidraw-runtime-card-desc {
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+  min-height: 52px;
+  overflow-wrap: anywhere;
+}
+
+.codex-excalidraw-runtime-control {
+  align-self: end;
+  display: grid;
+  min-width: 0;
+}
+
+.codex-excalidraw-runtime-select {
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 10px;
+  color: var(--text-normal);
+  font-size: 13px;
+  height: 38px;
+  margin: 0;
+  max-width: 100%;
+  min-width: 0;
+  width: 100%;
+}
+
+.codex-excalidraw-runtime-slider-row {
+  align-items: center;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) 54px;
+}
+
+.codex-excalidraw-runtime-slider-row input[type="range"] {
+  width: 100%;
+}
+
+.codex-excalidraw-runtime-value {
+  color: var(--text-muted);
+  font-size: 12px;
+  text-align: right;
+  white-space: nowrap;
 }
 
 .codex-excalidraw-prompt-picker {
@@ -1038,6 +1216,7 @@ button.codex-excalidraw-modal-card:focus-visible .codex-excalidraw-modal-card-ac
 
   .codex-excalidraw-picker-controls,
   .codex-excalidraw-preset-meta,
+  .codex-excalidraw-runtime-grid,
   .codex-excalidraw-modal-card-grid,
   .codex-excalidraw-action-grid {
     grid-template-columns: 1fr;
@@ -1054,5 +1233,19 @@ button.codex-excalidraw-modal-card:focus-visible .codex-excalidraw-modal-card-ac
   .codex-excalidraw-action-badge {
     grid-column: 1 / -1;
     justify-self: start;
+  }
+
+  .codex-excalidraw-panel-headline {
+    grid-template-columns: minmax(0, 1fr) 58px;
+  }
+
+  .codex-excalidraw-panel-illustration {
+    height: 58px;
+    width: 58px;
+  }
+
+  .codex-excalidraw-panel-illustration-svg {
+    height: 58px;
+    width: 78px;
   }
 }

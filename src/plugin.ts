@@ -38,7 +38,13 @@ import {
   type CodexPromptCategoryId,
   type CodexPromptPreset,
 } from "./prompt-presets";
-import { CodexExcalidrawSettingTab, DEFAULT_SETTINGS, type CodexExcalidrawSettings } from "./settings";
+import {
+  CODEX_MODEL_OPTIONS,
+  CodexExcalidrawSettingTab,
+  DEFAULT_SETTINGS,
+  modelDropdownValue,
+  type CodexExcalidrawSettings,
+} from "./settings";
 import type { NoteContext, NoteLink } from "./types";
 
 const CODEX_EXCALIDRAW_PANEL_VIEW = "codex-excalidraw-panel";
@@ -1223,12 +1229,14 @@ class CodexExcalidrawPanelView extends ItemView {
   private renderHeader(root: HTMLElement): void {
     const active = this.plugin.app.workspace.getActiveFile();
     const header = root.createDiv({ cls: "codex-excalidraw-panel-header" });
-    const identity = header.createDiv({ cls: "codex-excalidraw-panel-identity" });
+    const headline = header.createDiv({ cls: "codex-excalidraw-panel-headline" });
+    const identity = headline.createDiv({ cls: "codex-excalidraw-panel-identity" });
     identity.createEl("h2", { text: "Codex Drawing" });
     identity.createDiv({
       cls: "codex-excalidraw-panel-current",
       text: active ? active.path : "No active Markdown note or Excalidraw drawing",
     });
+    renderPanelHeaderIllustration(headline.createDiv({ cls: "codex-excalidraw-panel-illustration" }));
 
     const tools = header.createDiv({ cls: "codex-excalidraw-panel-toolbar" });
     this.addToolButton(tools, "sliders-horizontal", "모델", () => {
@@ -1773,144 +1781,134 @@ class PanelRuntimeStyleModal extends Modal {
     const { contentEl } = this;
     contentEl.empty();
     preparePanelModal(this, contentEl);
-    contentEl.createEl("h2", { text: "실행 / 스타일" });
-    contentEl.createEl("p", {
-      cls: "codex-excalidraw-config-note",
-      text: "패널에는 현재값만 작게 표시하고, 실행 모델과 드로잉 스타일은 여기서 저장합니다.",
+    renderPanelModalHero(contentEl, "실행 / 스타일", "Codex CLI 실행 모델과 한눈필기 드로잉 스타일을 한 화면에서 조정합니다.", "sliders-horizontal", "🎛️");
+
+    const grid = contentEl.createDiv({ cls: "codex-excalidraw-runtime-grid" });
+    let sourceSelect: HTMLSelectElement | null = null;
+
+    sourceSelect = this.createSelectCard(grid, {
+      icon: "plug-zap",
+      title: "런타임",
+      desc: "Codexian 설정을 우선 사용합니다. 직접 모델을 고르면 Custom fallback으로 전환됩니다.",
+      value: this.draft.codexSettingsSource,
+      options: {
+        codexian: "Codexian",
+        custom: "Custom fallback",
+      },
+      onChange: (value) => {
+        this.draft.codexSettingsSource = value === "custom" ? "custom" : "codexian";
+      },
     });
 
-    let sourceDropdown: { setValue(value: string): unknown } | null = null;
+    this.createSelectCard(grid, {
+      icon: "box",
+      title: "모델",
+      desc: "OpenAI Codex Models 문서의 추천 모델 목록입니다. Pro 계정은 Spark preview도 선택할 수 있습니다.",
+      value: modelDropdownValue(this.draft.codexModel),
+      options: CODEX_MODEL_OPTIONS,
+      onChange: (value) => {
+        this.draft.codexSettingsSource = "custom";
+        if (sourceSelect) sourceSelect.value = "custom";
+        this.draft.codexModel = value || DEFAULT_SETTINGS.codexModel;
+      },
+    });
 
-    new Setting(contentEl)
-      .setName("런타임")
-      .setDesc("Codexian 설정을 우선 사용합니다. 모델을 직접 바꾸면 Custom fallback으로 전환됩니다.")
-      .addDropdown((dropdown) => {
-        sourceDropdown = dropdown;
-        dropdown
-          .addOptions({
-            codexian: "Codexian",
-            custom: "Custom",
-          })
-          .setValue(this.draft.codexSettingsSource)
-          .onChange((value) => {
-            this.draft.codexSettingsSource = value === "custom" ? "custom" : "codexian";
-          });
-      });
+    this.createSelectCard(grid, {
+      icon: "brain",
+      title: "추론",
+      desc: "노트 맥락을 깊게 읽어야 하는 한눈필기는 high 또는 xhigh가 안정적입니다.",
+      value: this.draft.codexReasoningEffort,
+      options: {
+        low: "low",
+        medium: "medium",
+        high: "high",
+        xhigh: "xhigh",
+      },
+      onChange: (value) => {
+        this.draft.codexSettingsSource = "custom";
+        if (sourceSelect) sourceSelect.value = "custom";
+        this.draft.codexReasoningEffort = value as CodexExcalidrawSettings["codexReasoningEffort"];
+      },
+    });
 
-    new Setting(contentEl)
-      .setName("모델")
-      .addText((text) =>
-        text
-          .setPlaceholder(DEFAULT_SETTINGS.codexModel)
-          .setValue(this.draft.codexModel)
-          .onChange((value) => {
-            this.draft.codexSettingsSource = "custom";
-            sourceDropdown?.setValue("custom");
-            this.draft.codexModel = value.trim() || DEFAULT_SETTINGS.codexModel;
-          }),
-      );
-
-    new Setting(contentEl)
-      .setName("추론")
-      .addDropdown((dropdown) =>
-        dropdown
-          .addOptions({
-            low: "low",
-            medium: "medium",
-            high: "high",
-            xhigh: "xhigh",
-          })
-          .setValue(this.draft.codexReasoningEffort)
-          .onChange((value) => {
-            this.draft.codexSettingsSource = "custom";
-            sourceDropdown?.setValue("custom");
-            this.draft.codexReasoningEffort = value as CodexExcalidrawSettings["codexReasoningEffort"];
-          }),
-      );
-
-    new Setting(contentEl)
-      .setName("권한")
-      .addDropdown((dropdown) =>
-        dropdown
-          .addOptions({
-            review: "review",
-            auto: "auto",
-            yolo: "yolo",
-          })
-          .setValue(this.draft.codexPermissionMode)
-          .onChange((value) => {
-            this.draft.codexSettingsSource = "custom";
-            sourceDropdown?.setValue("custom");
-            this.draft.codexPermissionMode = value as CodexExcalidrawSettings["codexPermissionMode"];
-          }),
-      );
+    this.createSelectCard(grid, {
+      icon: "shield-check",
+      title: "권한",
+      desc: "review는 안전 확인 중심, auto는 빠른 작업, yolo는 승인 절차를 최소화합니다.",
+      value: this.draft.codexPermissionMode,
+      options: {
+        review: "review",
+        auto: "auto",
+        yolo: "yolo",
+      },
+      onChange: (value) => {
+        this.draft.codexSettingsSource = "custom";
+        if (sourceSelect) sourceSelect.value = "custom";
+        this.draft.codexPermissionMode = value as CodexExcalidrawSettings["codexPermissionMode"];
+      },
+    });
 
     let timeoutLabel: HTMLElement | null = null;
-    const timeoutSetting = new Setting(contentEl)
-      .setName("제한")
-      .setDesc("Codex CLI가 노트를 읽고 결과 파일을 쓰는 최대 시간입니다.")
-      .addSlider((slider) =>
-        slider
-          .setLimits(60, 1200, 60)
-          .setValue(this.draft.codexTimeoutSeconds)
-          .onChange((value) => {
-            this.draft.codexTimeoutSeconds = value;
-            timeoutLabel?.setText(`${value}s`);
-          }),
-      );
-    timeoutLabel = timeoutSetting.controlEl.createSpan({
-      cls: "codex-excalidraw-modal-value",
-      text: `${this.draft.codexTimeoutSeconds}s`,
+    timeoutLabel = this.createSliderCard(grid, {
+      icon: "timer",
+      title: "제한",
+      desc: "Codex CLI가 노트를 읽고 결과 파일을 쓰는 최대 시간입니다.",
+      value: this.draft.codexTimeoutSeconds,
+      min: 60,
+      max: 1200,
+      step: 60,
+      format: (value) => `${value}s`,
+      onChange: (value) => {
+        this.draft.codexTimeoutSeconds = value;
+        timeoutLabel?.setText(`${value}s`);
+      },
     });
 
-    new Setting(contentEl)
-      .setName("테마")
-      .addDropdown((dropdown) =>
-        dropdown
-          .addOptions({
-            chalkboard: "칠판",
-            whiteboard: "화이트보드",
-          })
-          .setValue(this.draft.visualTheme)
-          .onChange((value) => {
-            this.draft.visualTheme = value === "whiteboard" ? "whiteboard" : "chalkboard";
-          }),
-      );
+    this.createSelectCard(grid, {
+      icon: "palette",
+      title: "테마",
+      desc: "칠판은 손필기 감성, 화이트보드는 보고서 공유용으로 더 깔끔합니다.",
+      value: this.draft.visualTheme,
+      options: {
+        chalkboard: "칠판",
+        whiteboard: "화이트보드",
+      },
+      onChange: (value) => {
+        this.draft.visualTheme = value === "whiteboard" ? "whiteboard" : "chalkboard";
+      },
+    });
 
-    new Setting(contentEl)
-      .setName("폰트")
-      .setDesc("한글 손글씨는 Excalidraw Local Font에 실제 TTF가 지정되어 있어야 가장 자연스럽습니다.")
-      .addDropdown((dropdown) =>
-        dropdown
-          .addOptions({
-            "4": "Local Font",
-            "1": "Virgil",
-            "2": "Normal",
-            "3": "Code",
-          })
-          .setValue(String(this.draft.handwritingFontFamily))
-          .onChange((value) => {
-            this.draft.handwritingFontFamily = Number.parseInt(value, 10) || DEFAULT_SETTINGS.handwritingFontFamily;
-          }),
-      );
+    this.createSelectCard(grid, {
+      icon: "signature",
+      title: "폰트",
+      desc: "한글 손글씨는 Excalidraw Local Font에 실제 TTF가 지정되어 있어야 자연스럽습니다.",
+      value: String(this.draft.handwritingFontFamily),
+      options: {
+        "4": "Local Font",
+        "1": "Virgil",
+        "2": "Normal",
+        "3": "Code",
+      },
+      onChange: (value) => {
+        this.draft.handwritingFontFamily = Number.parseInt(value, 10) || DEFAULT_SETTINGS.handwritingFontFamily;
+      },
+    });
 
     let scaleLabel: HTMLElement | null = null;
-    const scaleSetting = new Setting(contentEl)
-      .setName("글자")
-      .setDesc("생성되는 Excalidraw 텍스트, 박스, 화살표 비율을 함께 조정합니다.")
-      .addSlider((slider) =>
-        slider
-          .setLimits(0.75, 1.5, 0.05)
-          .setValue(this.draft.studyNoteFontScale)
-          .onChange((value) => {
-            this.draft.studyNoteFontScale = roundPanelScale(value);
-            scaleLabel?.setText(`${this.draft.studyNoteFontScale.toFixed(2)}x`);
-          }),
-      );
-    scaleLabel = scaleSetting.controlEl.createSpan({
-        cls: "codex-excalidraw-modal-value codex-excalidraw-modal-value-scale",
-        text: `${this.draft.studyNoteFontScale.toFixed(2)}x`,
-      });
+    scaleLabel = this.createSliderCard(grid, {
+      icon: "type",
+      title: "글자",
+      desc: "생성되는 Excalidraw 텍스트, 박스, 화살표 비율을 함께 조정합니다.",
+      value: this.draft.studyNoteFontScale,
+      min: 0.75,
+      max: 1.5,
+      step: 0.05,
+      format: (value) => `${roundPanelScale(value).toFixed(2)}x`,
+      onChange: (value) => {
+        this.draft.studyNoteFontScale = roundPanelScale(value);
+        scaleLabel?.setText(`${this.draft.studyNoteFontScale.toFixed(2)}x`);
+      },
+    });
 
     const footer = contentEl.createDiv({ cls: "codex-excalidraw-modal-footer" });
     footer.createEl("button", { text: "취소" }).addEventListener("click", () => this.close());
@@ -1930,6 +1928,73 @@ class PanelRuntimeStyleModal extends Modal {
     await this.plugin.saveSettings();
     this.view.setStatus("실행 / 스타일 설정 저장됨");
     this.close();
+  }
+
+  private createSelectCard(
+    parent: HTMLElement,
+    options: {
+      icon: string;
+      title: string;
+      desc: string;
+      value: string;
+      options: Record<string, string>;
+      onChange: (value: string) => void;
+    },
+  ): HTMLSelectElement {
+    const control = this.createControlCard(parent, options.icon, options.title, options.desc);
+    const select = control.createEl("select", { cls: "codex-excalidraw-runtime-select" });
+    for (const [value, label] of Object.entries(options.options)) {
+      select.createEl("option", { text: label, value });
+    }
+    select.value = options.value;
+    select.addEventListener("change", () => {
+      options.onChange(select.value);
+    });
+    return select;
+  }
+
+  private createSliderCard(
+    parent: HTMLElement,
+    options: {
+      icon: string;
+      title: string;
+      desc: string;
+      value: number;
+      min: number;
+      max: number;
+      step: number;
+      format: (value: number) => string;
+      onChange: (value: number) => void;
+    },
+  ): HTMLElement {
+    const control = this.createControlCard(parent, options.icon, options.title, options.desc);
+    const sliderRow = control.createDiv({ cls: "codex-excalidraw-runtime-slider-row" });
+    const slider = sliderRow.createEl("input", {
+      attr: {
+        max: String(options.max),
+        min: String(options.min),
+        step: String(options.step),
+        type: "range",
+        value: String(options.value),
+      },
+    });
+    const value = sliderRow.createSpan({ cls: "codex-excalidraw-runtime-value", text: options.format(options.value) });
+    slider.addEventListener("input", () => {
+      const next = Number.parseFloat(slider.value);
+      value.setText(options.format(next));
+      options.onChange(next);
+    });
+    return value;
+  }
+
+  private createControlCard(parent: HTMLElement, icon: string, title: string, desc: string): HTMLElement {
+    const card = parent.createDiv({ cls: "codex-excalidraw-runtime-card" });
+    const head = card.createDiv({ cls: "codex-excalidraw-runtime-card-head" });
+    const mark = head.createSpan({ cls: "codex-excalidraw-runtime-card-icon" });
+    setIcon(mark, icon);
+    head.createDiv({ cls: "codex-excalidraw-runtime-card-title", text: title });
+    card.createDiv({ cls: "codex-excalidraw-runtime-card-desc", text: desc });
+    return card.createDiv({ cls: "codex-excalidraw-runtime-control" });
   }
 }
 
@@ -2241,6 +2306,49 @@ const PANEL_ACTION_CARDS: PanelActionCardSpec[] = [
 function preparePanelModal(modal: Modal, contentEl: HTMLElement): void {
   modal.modalEl.addClass("codex-excalidraw-config-modal-shell");
   contentEl.addClass("codex-excalidraw-config-modal");
+}
+
+function renderPanelModalHero(contentEl: HTMLElement, title: string, subtitle: string, icon: string, emoji: string): void {
+  const hero = contentEl.createDiv({ cls: "codex-excalidraw-modal-hero" });
+  const mark = hero.createDiv({ cls: "codex-excalidraw-modal-hero-mark" });
+  mark.createSpan({ cls: "codex-excalidraw-modal-hero-emoji", text: emoji });
+  const iconEl = mark.createSpan({ cls: "codex-excalidraw-modal-hero-icon" });
+  setIcon(iconEl, icon);
+  const copy = hero.createDiv({ cls: "codex-excalidraw-modal-hero-copy" });
+  copy.createEl("h2", { text: title });
+  copy.createEl("p", { text: subtitle });
+}
+
+function renderPanelHeaderIllustration(parent: HTMLElement): void {
+  parent.setAttr("aria-hidden", "true");
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", "0 0 120 90");
+  svg.setAttribute("role", "img");
+  svg.setAttribute("class", "codex-excalidraw-panel-illustration-svg");
+
+  const paper = svgEl("rect", { x: "18", y: "16", width: "62", height: "48", rx: "12", class: "panel-illustration-paper" });
+  const note = svgEl("rect", { x: "36", y: "28", width: "54", height: "38", rx: "10", class: "panel-illustration-note" });
+  const line1 = svgEl("path", { d: "M46 40h28", class: "panel-illustration-line" });
+  const line2 = svgEl("path", { d: "M46 50h18", class: "panel-illustration-line panel-illustration-line-soft" });
+  const nodeA = svgEl("circle", { cx: "78", cy: "33", r: "6", class: "panel-illustration-node" });
+  const nodeB = svgEl("circle", { cx: "96", cy: "55", r: "6", class: "panel-illustration-node panel-illustration-node-alt" });
+  const connector = svgEl("path", { d: "M83 37c10 4 15 10 13 17", class: "panel-illustration-connector" });
+  const pen = svgEl("path", { d: "M31 69l31-31 9 9-31 31-13 4z", class: "panel-illustration-pen" });
+  const sparkle = svgEl("path", { d: "M97 17l3 7 7 3-7 3-3 7-3-7-7-3 7-3z", class: "panel-illustration-spark" });
+  svg.append(paper, note, line1, line2, connector, nodeA, nodeB, pen, sparkle);
+  parent.appendChild(svg);
+}
+
+function svgEl(name: string, attrs: Record<string, string>): SVGElement {
+  const el = document.createElementNS("http://www.w3.org/2000/svg", name);
+  for (const [key, value] of Object.entries(attrs)) {
+    if (key === "class") {
+      el.setAttribute("class", value);
+    } else {
+      el.setAttribute(key, value);
+    }
+  }
+  return el;
 }
 
 function phaseLabel(phase: PanelPhase): string {

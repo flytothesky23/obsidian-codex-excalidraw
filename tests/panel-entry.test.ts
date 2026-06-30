@@ -64,6 +64,12 @@ describe("Codex drawing panel entry points", () => {
     expect(pluginSource).toContain("모델");
     expect(pluginSource).toContain("추론");
     expect(pluginSource).toContain("제한");
+    expect(settingsSource).toContain("CODEX_MODEL_OPTIONS");
+    expect(settingsSource).toContain("gpt-5.3-codex-spark");
+    expect(pluginSource).toContain("codex-excalidraw-runtime-grid");
+    expect(pluginSource).toContain("codex-excalidraw-runtime-select");
+    expect(stylesSource).toContain("grid-template-columns: repeat(3, minmax(0, 1fr))");
+    expect(stylesSource).toContain("codex-excalidraw-runtime-card");
   });
 
   it("keeps dense controls inside modals instead of expanding them in the side panel", () => {
@@ -127,6 +133,9 @@ describe("Codex drawing panel entry points", () => {
     expect(stylesSource).toContain(".codex-excalidraw-panel-agent-rail");
     expect(stylesSource).toContain(".codex-excalidraw-panel-toolbar .codex-excalidraw-panel-tool-button");
     expect(stylesSource).toContain(".codex-excalidraw-panel-composer-tools .codex-excalidraw-panel-tool-button");
+    expect(pluginSource).toContain("renderPanelHeaderIllustration");
+    expect(stylesSource).toContain("codex-excalidraw-panel-illustration");
+    expect(stylesSource).toContain("panel-illustration-spark");
   });
 
   it("prevents prompt/action modal cards from collapsing into overlapping button rows", () => {

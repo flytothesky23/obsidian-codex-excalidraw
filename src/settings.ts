@@ -47,6 +47,13 @@ export const DEFAULT_SETTINGS: CodexExcalidrawSettings = {
   codexTimeoutSeconds: 600,
 };
 
+export const CODEX_MODEL_OPTIONS: Record<string, string> = {
+  "gpt-5.5": "gpt-5.5 · recommended",
+  "gpt-5.4": "gpt-5.4 · flagship",
+  "gpt-5.4-mini": "gpt-5.4-mini · fast",
+  "gpt-5.3-codex-spark": "gpt-5.3-codex-spark · Pro preview",
+};
+
 export class CodexExcalidrawSettingTab extends PluginSettingTab {
   constructor(app: App, private plugin: CodexExcalidrawPlugin) {
     super(app, plugin);
@@ -254,9 +261,9 @@ export class CodexExcalidrawSettingTab extends PluginSettingTab {
     new Setting(containerEl)
       .setName("Codex CLI model")
       .setDesc("Custom fallback only. Codexian's model is used when Codexian settings are selected.")
-      .addText((text) =>
-        text.setValue(this.plugin.settings.codexModel).onChange(async (value) => {
-          this.plugin.settings.codexModel = value.trim() || DEFAULT_SETTINGS.codexModel;
+      .addDropdown((dropdown) =>
+        dropdown.addOptions(CODEX_MODEL_OPTIONS).setValue(modelDropdownValue(this.plugin.settings.codexModel)).onChange(async (value) => {
+          this.plugin.settings.codexModel = value || DEFAULT_SETTINGS.codexModel;
           await this.plugin.saveSettings();
         }),
       );
@@ -325,6 +332,10 @@ export class CodexExcalidrawSettingTab extends PluginSettingTab {
           }),
       );
   }
+}
+
+export function modelDropdownValue(model: string): string {
+  return Object.prototype.hasOwnProperty.call(CODEX_MODEL_OPTIONS, model) ? model : DEFAULT_SETTINGS.codexModel;
 }
 
 function roundScale(value: number): number {
