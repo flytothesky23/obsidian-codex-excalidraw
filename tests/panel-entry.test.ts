@@ -61,4 +61,22 @@ describe("Codex drawing panel entry points", () => {
     expect(pluginSource).toContain("updateProgressStatus");
     expect(pluginSource).toContain("경과");
   });
+
+  it("protects Markdown source notes by routing rewrite requests to a copy", () => {
+    expect(pluginSource).toContain("Never modify a Markdown source note in place");
+    expect(pluginSource).toContain("createMarkdownRevisionCopy");
+    expect(pluginSource).toContain("shouldCreateMarkdownRevisionCopy");
+    expect(pluginSource).toContain("_수정");
+    expect(pluginSource).toContain("원본 노트는 수정하지 않았습니다");
+    expect(pluginSource).toContain("수정 사본:");
+  });
+
+  it("surfaces generated output paths with open and copy actions", () => {
+    expect(pluginSource).toContain("formatActionOutput");
+    expect(pluginSource).toContain("결과 파일:");
+    expect(pluginSource).toContain("lastOutputPath");
+    expect(pluginSource).toContain("결과 열기");
+    expect(pluginSource).toContain("경로 복사");
+    expect(stylesSource).toContain("codex-excalidraw-panel-output-path");
+  });
 });

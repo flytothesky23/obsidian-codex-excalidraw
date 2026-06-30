@@ -284,6 +284,28 @@
   transition: width 160ms ease;
 }
 
+.codex-excalidraw-panel-output {
+  border-top: 1px solid var(--background-modifier-border);
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+  padding-top: 8px;
+}
+
+.codex-excalidraw-panel-output-path {
+  color: var(--text-muted);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.codex-excalidraw-panel-output-actions {
+  display: grid;
+  gap: 6px;
+  grid-template-columns: 1fr 1fr;
+}
+
 .codex-excalidraw-panel-note {
   color: var(--text-muted);
   font-size: 12px;

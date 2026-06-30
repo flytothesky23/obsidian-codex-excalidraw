@@ -243,14 +243,14 @@ export default class CodexExcalidrawPlugin extends Plugin {
     if (action === "obsidian-canvas") {
       if (isCanvasFile(active)) {
         const summary = await this.reviseActiveCanvasWithCodex(active.path, instruction);
-        return summary || `Updated ${active.path}`;
+        return formatActionOutput(summary || "현재 Canvas 수정 완료", active.path);
       }
       if (isExcalidrawDrawing(active)) {
         throw new Error("Open a source Markdown note or an existing .canvas file for Obsidian Canvas work.");
       }
       const files = await this.expandLinkedNotes(active);
       const path = await this.createCanvasFromFiles(files, active.basename, true, instruction);
-      return `Created ${path}`;
+      return formatActionOutput("Obsidian Canvas 생성 완료", path);
     }
 
     if (action === "revise-active") {
@@ -258,7 +258,7 @@ export default class CodexExcalidrawPlugin extends Plugin {
         throw new Error("Open an .excalidraw.md drawing before using current-drawing revision.");
       }
       const summary = await this.reviseActiveDrawingWithCodex(active.path, instruction);
-      return summary || `Updated ${active.path}`;
+      return formatActionOutput(summary || "현재 드로잉 수정 완료", active.path);
     }
 
     if (isExcalidrawDrawing(active)) {
@@ -287,7 +287,7 @@ export default class CodexExcalidrawPlugin extends Plugin {
       }
     }
 
-    return summary || `Created ${path}`;
+    return formatActionOutput(summary || `${actionLabel(action)} 완료`, path);
   }
 
   async runCodexChat(
@@ -305,6 +305,9 @@ export default class CodexExcalidrawPlugin extends Plugin {
     }
 
     const active = this.app.workspace.getActiveFile();
+    const markdownRevisionCopy = active instanceof TFile && isPlainMarkdownNote(active) && shouldCreateMarkdownRevisionCopy(trimmedInstruction)
+      ? await this.createMarkdownRevisionCopy(active)
+      : null;
     const activeContent = active instanceof TFile
       ? truncate(await this.app.vault.cachedRead(active), this.settings.maxCharactersPerNote)
       : "";
@@ -314,7 +317,12 @@ export default class CodexExcalidrawPlugin extends Plugin {
       "You are running inside an Obsidian vault from the Codex drawing side panel.",
       "Answer in Korean unless the user asks otherwise.",
       "Use the current vault files as the working source of truth.",
-      "If the user explicitly asks to edit the current drawing, Canvas, SVG, or Markdown note, edit only the active target file unless they name another file.",
+      "Never modify a Markdown source note in place.",
+      markdownRevisionCopy
+        ? `A safe Markdown copy has already been created for this request. If the user is asking to rewrite or reorganize Markdown, edit only this copy: ${markdownRevisionCopy.path}`
+        : "If the user asks to rewrite or reorganize Markdown and no safe copy target is listed, answer with the proposed structure instead of editing the source note.",
+      active && markdownRevisionCopy ? `Original Markdown note is read-only for this request: ${active.path}` : "",
+      "If the user explicitly asks to edit the current drawing, Canvas, or SVG/Excalidraw target, edit only that visual target file unless they name another file.",
       "If the user is asking a question, answer directly and do not modify files.",
       "When creating or revising visual notes, prefer readable teacher-board structure: question, provisional conclusion, evidence, tension, caveat, next check.",
       "",
@@ -344,7 +352,30 @@ export default class CodexExcalidrawPlugin extends Plugin {
       onStdout: (chunk) => onUpdate?.(chunk, "stdout"),
       onStderr: (chunk) => onUpdate?.(chunk, "stderr"),
     });
-    return (result.stdout || result.stderr).trim() || "Codex 응답이 비어 있습니다.";
+    const finalText = (result.stdout || result.stderr).trim() || "Codex 응답이 비어 있습니다.";
+    if (markdownRevisionCopy) {
+      await this.openVaultPath(markdownRevisionCopy.path);
+      return [
+        finalText,
+        "",
+        `원본 노트는 수정하지 않았습니다: ${active?.path ?? "unknown"}`,
+        `수정 사본: ${markdownRevisionCopy.path}`,
+      ].join("\n");
+    }
+    return finalText;
+  }
+
+  async openVaultPath(path: string): Promise<void> {
+    const file = this.app.vault.getAbstractFileByPath(path);
+    if (!(file instanceof TFile)) {
+      new Notice(`Cannot find generated file: ${path}`, 9000);
+      return;
+    }
+    if (isExcalidrawDrawing(file)) {
+      await this.openGeneratedDrawing(file);
+      return;
+    }
+    await this.app.workspace.getLeaf("tab").openFile(file);
   }
 
   async openActiveFileInCodexian(): Promise<void> {
@@ -477,6 +508,28 @@ export default class CodexExcalidrawPlugin extends Plugin {
     const brief = buildCodexBrief(contexts, targetPath, this.codexBriefOptions());
     await navigator.clipboard.writeText(brief);
     new Notice(`Copied Codex drawing brief for ${contexts.length} note(s).`);
+  }
+
+  private async createMarkdownRevisionCopy(source: TFile): Promise<TFile> {
+    const content = await this.app.vault.cachedRead(source);
+    const path = await this.nextMarkdownSiblingPath(source, `${source.basename}_수정`);
+    const created = await this.app.vault.create(path, content);
+    if (!(created instanceof TFile)) {
+      throw new Error(`Failed to create Markdown revision copy: ${path}`);
+    }
+    new Notice(`원본 보호: ${path} 사본을 만들고 이 파일만 수정합니다.`, 9000);
+    return created;
+  }
+
+  private async nextMarkdownSiblingPath(source: TFile, basename: string): Promise<string> {
+    const folder = source.parent?.path ?? "";
+    let counter = 1;
+    let path = normalizePath(folder ? `${folder}/${basename}.md` : `${basename}.md`);
+    while (this.app.vault.getAbstractFileByPath(path)) {
+      counter += 1;
+      path = normalizePath(folder ? `${folder}/${basename} ${counter}.md` : `${basename} ${counter}.md`);
+    }
+    return path;
   }
 
   private async refineWithCodex(
@@ -893,6 +946,33 @@ function isCanvasFile(file: TFile): boolean {
   return file.path.endsWith(".canvas");
 }
 
+function isPlainMarkdownNote(file: TFile): boolean {
+  return file.extension === "md" && !isExcalidrawDrawing(file);
+}
+
+function shouldCreateMarkdownRevisionCopy(instruction: string): boolean {
+  const normalized = instruction.replace(/\s+/g, " ").trim();
+  if (!normalized) return false;
+  const mentionsSourceText = /(본문|노트|문서|파일|회의록|원문|내용)/.test(normalized);
+  const rewriteIntent = /(수정|고쳐|바꿔|변경|재구성|다시 구성|구조화|정리|보강|작성|리라이트|rewrite|reorganize|restructure)/i
+    .test(normalized);
+  const directRewrite = /(재구성하라|다시 구성하라|구조로.*구성|구조로.*정리|수정해|고쳐줘|바꿔줘|보강해)/.test(normalized);
+  return (mentionsSourceText && rewriteIntent) || directRewrite;
+}
+
+function formatActionOutput(summary: string, path: string): string {
+  return [
+    summary.trim(),
+    "",
+    `결과 파일: ${path}`,
+  ].filter(Boolean).join("\n");
+}
+
+function extractOutputPath(value: string): string {
+  const match = value.match(/(?:결과 파일|수정 사본):\s*([^\n]+)/);
+  return match?.[1]?.trim() ?? "";
+}
+
 function panelActionPrompt(action: CodexPanelAction): string {
   switch (action) {
     case "study-note":
@@ -931,6 +1011,7 @@ class CodexExcalidrawPanelView extends ItemView {
   private progressTimer: number | null = null;
   private runningStartedAt = 0;
   private runningLabel = "";
+  private lastOutputPath = "";
 
   constructor(leaf: WorkspaceLeaf, private plugin: CodexExcalidrawPlugin) {
     super(leaf);
@@ -1020,7 +1101,7 @@ class CodexExcalidrawPanelView extends ItemView {
 
     root.createEl("p", {
       cls: "codex-excalidraw-panel-note",
-      text: "Codexian 설정을 우선 사용합니다. 대화는 현재 노트를 맥락으로 읽고, 명시적으로 수정 요청을 받은 경우에만 현재 드로잉·Canvas·노트를 편집합니다.",
+      text: "Codexian 설정을 우선 사용합니다. Markdown 원본은 읽기 전용으로 두고, 재구성·수정 요청은 같은 폴더의 _수정.md 사본에 적용합니다.",
     });
   }
 
@@ -1036,6 +1117,17 @@ class CodexExcalidrawPanelView extends ItemView {
     const progress = status.createDiv({ cls: "codex-excalidraw-panel-progress" });
     const fill = progress.createDiv({ cls: "codex-excalidraw-panel-progress-fill" });
     fill.style.width = `${this.progressPercent()}%`;
+    if (this.lastOutputPath) {
+      const output = status.createDiv({ cls: "codex-excalidraw-panel-output" });
+      output.createDiv({ cls: "codex-excalidraw-panel-output-path", text: this.lastOutputPath });
+      const actions = output.createDiv({ cls: "codex-excalidraw-panel-output-actions" });
+      this.addButton(actions, "결과 열기", () => {
+        void this.plugin.openVaultPath(this.lastOutputPath);
+      }, this.isRunning);
+      this.addButton(actions, "경로 복사", () => {
+        void this.copyText(this.lastOutputPath, "결과 경로");
+      }, this.isRunning);
+    }
   }
 
   private progressPercent(): number {
@@ -1249,6 +1341,7 @@ class CodexExcalidrawPanelView extends ItemView {
       const summary = await this.plugin.runCodexPanelAction(action, this.promptValue);
       this.stopProgress();
       this.statusText = summary || `${actionLabel(action)} 완료`;
+      this.lastOutputPath = extractOutputPath(summary) || this.lastOutputPath;
     } catch (error) {
       this.stopProgress();
       const message = error instanceof Error ? error.message : String(error);
@@ -1287,6 +1380,7 @@ class CodexExcalidrawPanelView extends ItemView {
       }, history);
       this.stopProgress();
       assistantMessage.text = finalText;
+      this.lastOutputPath = extractOutputPath(finalText) || this.lastOutputPath;
       this.statusText = "Codex 응답 완료";
     } catch (error) {
       this.stopProgress();
