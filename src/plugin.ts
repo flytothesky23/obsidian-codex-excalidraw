@@ -1532,7 +1532,7 @@ class PanelRuntimeStyleModal extends Modal {
   onOpen(): void {
     const { contentEl } = this;
     contentEl.empty();
-    contentEl.addClass("codex-excalidraw-config-modal");
+    preparePanelModal(this, contentEl);
     contentEl.createEl("h2", { text: "실행 / 스타일" });
     contentEl.createEl("p", {
       cls: "codex-excalidraw-config-note",
@@ -1704,7 +1704,7 @@ class PanelPromptToolsModal extends Modal {
   onOpen(): void {
     const { contentEl } = this;
     contentEl.empty();
-    contentEl.addClass("codex-excalidraw-config-modal");
+    preparePanelModal(this, contentEl);
     contentEl.createEl("h2", { text: "프롬프트 도구" });
     contentEl.createEl("p", {
       cls: "codex-excalidraw-config-note",
@@ -1713,8 +1713,13 @@ class PanelPromptToolsModal extends Modal {
     const grid = contentEl.createDiv({ cls: "codex-excalidraw-modal-card-grid" });
     for (const preset of CODEX_PROMPT_PRESETS) {
       const card = grid.createEl("button", { cls: "codex-excalidraw-modal-card" });
-      card.createSpan({ cls: "codex-excalidraw-modal-card-title", text: preset.label });
-      card.createSpan({ cls: "codex-excalidraw-modal-card-desc", text: truncate(preset.instruction, 92) });
+      card.setAttr("type", "button");
+      card.setAttr("aria-label", `${preset.label} 프롬프트 추가`);
+      card.createSpan({ cls: "codex-excalidraw-modal-card-kicker", text: "프롬프트" });
+      const body = card.createDiv({ cls: "codex-excalidraw-modal-card-body" });
+      body.createSpan({ cls: "codex-excalidraw-modal-card-title", text: preset.label });
+      body.createSpan({ cls: "codex-excalidraw-modal-card-desc", text: truncate(preset.instruction, 130) });
+      card.createSpan({ cls: "codex-excalidraw-modal-card-action", text: "추가" });
       card.addEventListener("click", () => {
         this.view.applyPromptPreset(preset.label, preset.instruction);
         this.close();
@@ -1738,7 +1743,7 @@ class PanelActionModal extends Modal {
   onOpen(): void {
     const { contentEl } = this;
     contentEl.empty();
-    contentEl.addClass("codex-excalidraw-config-modal");
+    preparePanelModal(this, contentEl);
     contentEl.createEl("h2", { text: "드로잉 / Canvas 작업" });
     contentEl.createEl("p", {
       cls: "codex-excalidraw-config-note",
@@ -1775,13 +1780,23 @@ class PanelActionModal extends Modal {
 
   private addActionCard(parent: HTMLElement, title: string, description: string, run: () => void): void {
     const card = parent.createEl("button", { cls: "codex-excalidraw-modal-card" });
-    card.createSpan({ cls: "codex-excalidraw-modal-card-title", text: title });
-    card.createSpan({ cls: "codex-excalidraw-modal-card-desc", text: description });
+    card.setAttr("type", "button");
+    card.setAttr("aria-label", `${title} 실행`);
+    card.createSpan({ cls: "codex-excalidraw-modal-card-kicker", text: "작업" });
+    const body = card.createDiv({ cls: "codex-excalidraw-modal-card-body" });
+    body.createSpan({ cls: "codex-excalidraw-modal-card-title", text: title });
+    body.createSpan({ cls: "codex-excalidraw-modal-card-desc", text: description });
+    card.createSpan({ cls: "codex-excalidraw-modal-card-action", text: "실행" });
     card.addEventListener("click", () => {
       this.close();
       run();
     });
   }
+}
+
+function preparePanelModal(modal: Modal, contentEl: HTMLElement): void {
+  modal.modalEl.addClass("codex-excalidraw-config-modal-shell");
+  contentEl.addClass("codex-excalidraw-config-modal");
 }
 
 function phaseLabel(phase: PanelPhase): string {

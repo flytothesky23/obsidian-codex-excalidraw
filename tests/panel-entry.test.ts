@@ -50,10 +50,22 @@ describe("Codex drawing panel entry points", () => {
     expect(pluginSource).toContain("PanelRuntimeStyleModal");
     expect(pluginSource).toContain("PanelPromptToolsModal");
     expect(pluginSource).toContain("PanelActionModal");
+    expect(pluginSource).toContain("preparePanelModal");
     expect(pluginSource).toContain("codex-excalidraw-panel-toolbar");
     expect(pluginSource).toContain("codex-excalidraw-panel-composer-bar");
     expect(stylesSource).toContain("codex-excalidraw-config-modal");
     expect(stylesSource).toContain("codex-excalidraw-modal-card");
+  });
+
+  it("prevents prompt/action modal cards from collapsing into overlapping button rows", () => {
+    expect(stylesSource).toContain("codex-excalidraw-config-modal-shell.modal");
+    expect(stylesSource).toContain("button.codex-excalidraw-modal-card");
+    expect(stylesSource).toContain("height: auto");
+    expect(stylesSource).toContain("white-space: normal");
+    expect(stylesSource).toContain("overflow: visible");
+    expect(stylesSource).toContain("grid-template-columns: minmax(0, 1fr) auto");
+    expect(stylesSource).toContain("codex-excalidraw-modal-card-body");
+    expect(stylesSource).toContain("codex-excalidraw-modal-card-action");
   });
 
   it("shows Codex CLI phase progress like reading, thinking, editing, and verifying", () => {
