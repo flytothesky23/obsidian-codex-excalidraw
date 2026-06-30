@@ -37,8 +37,10 @@ describe("Codex drawing panel entry points", () => {
     expect(stylesSource).toContain("overflow-wrap: anywhere");
   });
 
-  it("exposes runtime controls and progress state in the panel", () => {
-    expect(pluginSource).toContain("작업 상태");
+  it("exposes runtime controls and agent progress state in the chat stream", () => {
+    expect(pluginSource).toContain("renderAgentEvent");
+    expect(pluginSource).toContain("agentSubtitle");
+    expect(pluginSource).toContain("agentStatusTitle");
     expect(pluginSource).toContain("progressPercent");
     expect(pluginSource).toContain("런타임");
     expect(pluginSource).toContain("모델");
@@ -68,7 +70,8 @@ describe("Codex drawing panel entry points", () => {
     expect(stylesSource).toContain("flex-wrap: nowrap");
     expect(stylesSource).toContain("white-space: nowrap");
     expect(stylesSource).toContain("word-break: keep-all");
-    expect(stylesSource).toContain(".codex-excalidraw-panel-status-head .codex-excalidraw-panel-section-title");
+    expect(stylesSource).toContain(".codex-excalidraw-panel-agent-event");
+    expect(stylesSource).toContain(".codex-excalidraw-panel-agent-rail");
     expect(stylesSource).toContain(".codex-excalidraw-panel-toolbar .codex-excalidraw-panel-tool-button");
     expect(stylesSource).toContain(".codex-excalidraw-panel-composer-tools .codex-excalidraw-panel-tool-button");
   });
@@ -84,17 +87,20 @@ describe("Codex drawing panel entry points", () => {
     expect(stylesSource).toContain("codex-excalidraw-modal-card-action");
   });
 
-  it("shows Codex CLI phase progress like reading, thinking, editing, and verifying", () => {
+  it("shows Codex CLI phase progress as an integrated agent event, not a separate badge rail", () => {
     expect(pluginSource).toContain("PanelPhase");
-    expect(pluginSource).toContain("PANEL_PHASES");
     expect(pluginSource).toContain("읽기");
     expect(pluginSource).toContain("생각중");
     expect(pluginSource).toContain("편집");
     expect(pluginSource).toContain("검증");
     expect(pluginSource).toContain("inferCodexPhase");
     expect(pluginSource).toContain("ingestCodexChunk");
-    expect(stylesSource).toContain("codex-excalidraw-panel-phase-rail");
-    expect(stylesSource).toContain("codex-excalidraw-panel-activity");
+    expect(pluginSource).not.toContain("renderStatus(root)");
+    expect(pluginSource).not.toContain("PANEL_PHASES");
+    expect(stylesSource).not.toContain("codex-excalidraw-panel-phase-rail");
+    expect(stylesSource).not.toContain("codex-excalidraw-panel-status-pill");
+    expect(stylesSource).toContain("codex-excalidraw-panel-agent-progress");
+    expect(stylesSource).toContain("codex-excalidraw-panel-agent-activity");
   });
 
   it("uses Codexian settings as the default runtime source", () => {

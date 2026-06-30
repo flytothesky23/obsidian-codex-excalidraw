@@ -1117,15 +1117,6 @@ interface PanelMessage {
 
 type PanelPhase = "idle" | "preparing" | "reading" | "thinking" | "editing" | "verifying" | "complete" | "failed";
 
-const PANEL_PHASES: Array<{ id: PanelPhase; label: string }> = [
-  { id: "preparing", label: "준비" },
-  { id: "reading", label: "읽기" },
-  { id: "thinking", label: "생각중" },
-  { id: "editing", label: "편집" },
-  { id: "verifying", label: "검증" },
-  { id: "complete", label: "완료" },
-];
-
 class CodexExcalidrawPanelView extends ItemView {
   private promptValue = "";
   private statusText = "";
@@ -1174,7 +1165,6 @@ class CodexExcalidrawPanelView extends ItemView {
     const root = contentEl.createDiv({ cls: "codex-excalidraw-panel" });
 
     this.renderHeader(root);
-    this.renderStatus(root);
     this.renderChat(root);
     this.renderComposer(root);
   }
@@ -1219,54 +1209,6 @@ class CodexExcalidrawPanelView extends ItemView {
     ].join(" · ");
   }
 
-  private renderStatus(root: HTMLElement): void {
-    const status = root.createDiv({
-      cls: `codex-excalidraw-panel-status codex-excalidraw-panel-status-${this.isRunning ? "running" : "idle"}`,
-    });
-    const head = status.createDiv({ cls: "codex-excalidraw-panel-status-head" });
-    head.createDiv({ cls: "codex-excalidraw-panel-section-title", text: "작업 상태" });
-    head.createSpan({
-      cls: "codex-excalidraw-panel-status-pill",
-      text: phaseLabel(this.currentPhase),
-    });
-    const phaseRail = status.createDiv({ cls: "codex-excalidraw-panel-phase-rail" });
-    const activeIndex = Math.max(0, PANEL_PHASES.findIndex((phase) => phase.id === this.currentPhase));
-    for (const [index, phase] of PANEL_PHASES.entries()) {
-      const state = phase.id === this.currentPhase
-        ? "active"
-        : index < activeIndex || this.currentPhase === "complete"
-          ? "done"
-          : "pending";
-      const chip = phaseRail.createDiv({ cls: `codex-excalidraw-panel-phase codex-excalidraw-panel-phase-${state}` });
-      chip.createSpan({ cls: "codex-excalidraw-panel-phase-dot" });
-      chip.createSpan({ text: phase.label });
-    }
-    const main = status.createDiv({ cls: "codex-excalidraw-panel-status-main" });
-    main.createDiv({ cls: "codex-excalidraw-panel-phase-detail", text: this.phaseDetail });
-    for (const line of (this.statusText || "대기 중").split(/\r?\n/).filter(Boolean).slice(0, 3)) {
-      main.createDiv({ text: line });
-    }
-    const progress = status.createDiv({ cls: "codex-excalidraw-panel-progress" });
-    const fill = progress.createDiv({ cls: "codex-excalidraw-panel-progress-fill" });
-    fill.style.width = `${this.progressPercent()}%`;
-    const activity = status.createDiv({ cls: "codex-excalidraw-panel-activity" });
-    const activityLines = this.activityLines.length ? this.activityLines : ["아직 실행 내역이 없습니다."];
-    for (const line of activityLines.slice(-5)) {
-      activity.createDiv({ cls: "codex-excalidraw-panel-activity-line", text: line });
-    }
-    if (this.lastOutputPath) {
-      const output = status.createDiv({ cls: "codex-excalidraw-panel-output" });
-      output.createDiv({ cls: "codex-excalidraw-panel-output-path", text: this.lastOutputPath });
-      const actions = output.createDiv({ cls: "codex-excalidraw-panel-output-actions" });
-      this.addButton(actions, "결과 열기", () => {
-        void this.plugin.openVaultPath(this.lastOutputPath);
-      }, this.isRunning);
-      this.addButton(actions, "경로 복사", () => {
-        void this.copyText(this.lastOutputPath, "결과 경로");
-      }, this.isRunning);
-    }
-  }
-
   private progressPercent(): number {
     if (!this.isRunning || this.runningStartedAt <= 0) return 0;
     const elapsed = Math.max(0, Date.now() - this.runningStartedAt);
@@ -1275,13 +1217,17 @@ class CodexExcalidrawPanelView extends ItemView {
   }
 
   private renderChat(root: HTMLElement): void {
-    const shell = root.createDiv({ cls: "codex-excalidraw-panel-chat-shell" });
+    const shell = root.createDiv({
+      cls: `codex-excalidraw-panel-chat-shell codex-excalidraw-panel-agent-shell ${
+        this.isRunning ? "codex-excalidraw-panel-agent-shell-running" : ""
+      }`,
+    });
     const header = shell.createDiv({ cls: "codex-excalidraw-panel-chat-header" });
     header.createSpan({ cls: "codex-excalidraw-panel-chat-title", text: "Codex 대화창" });
     const chatActions = header.createDiv({ cls: "codex-excalidraw-panel-chat-actions" });
     chatActions.createSpan({
       cls: "codex-excalidraw-panel-chat-subtitle",
-      text: this.isRunning ? "실시간 출력 수신 중" : "현재 노트 맥락",
+      text: this.agentSubtitle(),
     });
     if (this.messages.length > 0) {
       this.addButton(chatActions, "전체 복사", () => {
@@ -1289,13 +1235,13 @@ class CodexExcalidrawPanelView extends ItemView {
       }, this.isRunning);
     }
 
-    const chat = shell.createDiv({ cls: "codex-excalidraw-panel-chat-log" });
+    const chat = shell.createDiv({ cls: "codex-excalidraw-panel-chat-log codex-excalidraw-panel-agent-log" });
+    this.renderAgentEvent(chat);
     if (this.messages.length === 0) {
       chat.createDiv({
         cls: "codex-excalidraw-panel-chat-empty",
-        text: "아래 입력창에서 Codex에게 질문하거나 현재 노트·드로잉·Canvas 수정 방향을 지시하세요. 응답과 작업 상태는 이 창에 누적됩니다.",
+        text: "아래 입력창에서 Codex에게 질문하거나 현재 노트·드로잉·Canvas 수정 방향을 지시하세요. 실행 상태와 응답은 이 대화 스트림에 함께 누적됩니다.",
       });
-      return;
     }
 
     for (const message of this.messages) {
@@ -1315,9 +1261,85 @@ class CodexExcalidrawPanelView extends ItemView {
         text: message.text || (message.role === "assistant" ? "응답 수신 중..." : ""),
       });
     }
+    if (this.lastOutputPath) {
+      this.renderOutputEvent(chat);
+    }
     window.setTimeout(() => {
       chat.scrollTop = chat.scrollHeight;
     }, 0);
+  }
+
+  private renderAgentEvent(chat: HTMLElement): void {
+    const event = chat.createDiv({
+      cls: `codex-excalidraw-panel-agent-event codex-excalidraw-panel-agent-event-${this.currentPhase}`,
+    });
+    const rail = event.createDiv({ cls: "codex-excalidraw-panel-agent-rail" });
+    rail.createSpan({ cls: "codex-excalidraw-panel-agent-marker" });
+
+    const body = event.createDiv({ cls: "codex-excalidraw-panel-agent-body" });
+    body.createDiv({ cls: "codex-excalidraw-panel-agent-kicker", text: "Codex CLI" });
+    body.createDiv({ cls: "codex-excalidraw-panel-agent-title", text: this.agentStatusTitle() });
+    body.createDiv({ cls: "codex-excalidraw-panel-agent-detail", text: this.phaseDetail });
+
+    const statusLines = (this.statusText || "")
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .slice(0, 3);
+    if (statusLines.length > 0) {
+      const details = body.createDiv({ cls: "codex-excalidraw-panel-agent-details" });
+      for (const line of statusLines) {
+        details.createDiv({ text: line });
+      }
+    }
+
+    if (this.isRunning) {
+      const progress = body.createDiv({ cls: "codex-excalidraw-panel-agent-progress" });
+      const fill = progress.createDiv({ cls: "codex-excalidraw-panel-agent-progress-fill" });
+      fill.style.width = `${this.progressPercent()}%`;
+    }
+
+    const recentLines = this.activityLines.slice(-5);
+    if (recentLines.length > 0) {
+      const activity = body.createDiv({ cls: "codex-excalidraw-panel-agent-activity" });
+      for (const line of recentLines) {
+        activity.createDiv({ cls: "codex-excalidraw-panel-agent-activity-line", text: line });
+      }
+    }
+  }
+
+  private renderOutputEvent(chat: HTMLElement): void {
+    const output = chat.createDiv({ cls: "codex-excalidraw-panel-output codex-excalidraw-panel-agent-output" });
+    output.createDiv({ cls: "codex-excalidraw-panel-agent-kicker", text: "결과 파일" });
+    output.createDiv({ cls: "codex-excalidraw-panel-output-path", text: this.lastOutputPath });
+    const actions = output.createDiv({ cls: "codex-excalidraw-panel-output-actions" });
+    this.addButton(actions, "결과 열기", () => {
+      void this.plugin.openVaultPath(this.lastOutputPath);
+    }, this.isRunning);
+    this.addButton(actions, "경로 복사", () => {
+      void this.copyText(this.lastOutputPath, "결과 경로");
+    }, this.isRunning);
+  }
+
+  private agentSubtitle(): string {
+    if (this.isRunning) {
+      return `${phaseLabel(this.currentPhase)} 중 · ${this.elapsedSeconds()}s / ${this.plugin.settings.codexTimeoutSeconds}s`;
+    }
+    if (this.currentPhase === "complete") return "최근 작업 완료";
+    if (this.currentPhase === "failed") return "최근 작업 실패";
+    return "현재 노트 맥락";
+  }
+
+  private agentStatusTitle(): string {
+    if (this.isRunning) return this.runningLabel || `${phaseLabel(this.currentPhase)} 중`;
+    if (this.currentPhase === "complete") return "작업 완료";
+    if (this.currentPhase === "failed") return "작업 실패";
+    return "대기 중";
+  }
+
+  private elapsedSeconds(): number {
+    if (this.runningStartedAt <= 0) return 0;
+    return Math.max(0, Math.round((Date.now() - this.runningStartedAt) / 1000));
   }
 
   private chatTranscript(): string {
@@ -1593,7 +1615,7 @@ class CodexExcalidrawPanelView extends ItemView {
   }
 
   private updateProgressStatus(): void {
-    const elapsed = Math.max(0, Math.round((Date.now() - this.runningStartedAt) / 1000));
+    const elapsed = this.elapsedSeconds();
     this.statusText = [
       `${this.runningLabel}... 경과 ${elapsed}s / 최대 ${this.plugin.settings.codexTimeoutSeconds}s`,
       this.plugin.getCodexRuntimeSummary(),

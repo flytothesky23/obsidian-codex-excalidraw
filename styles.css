@@ -178,12 +178,16 @@
 .codex-excalidraw-panel-chat-shell {
   background: var(--background-primary);
   border: 1px solid var(--background-modifier-border);
-  border-radius: 10px;
+  border-radius: 14px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 8px;
-  min-height: 220px;
+  gap: 10px;
+  min-height: 410px;
+  padding: 10px;
+}
+
+.codex-excalidraw-panel-agent-shell-running {
+  border-color: color-mix(in srgb, var(--interactive-accent) 54%, var(--background-modifier-border));
 }
 
 .codex-excalidraw-panel-chat-header {
@@ -209,8 +213,8 @@
 
 .codex-excalidraw-panel-chat-title {
   color: var(--text-normal);
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 16px;
+  font-weight: 720;
 }
 
 .codex-excalidraw-panel-chat-subtitle {
@@ -219,16 +223,16 @@
 }
 
 .codex-excalidraw-panel-chat-log {
-  background: var(--background-secondary);
+  background: var(--background-primary);
   border: 1px solid var(--background-modifier-border);
-  border-radius: 8px;
+  border-radius: 12px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  max-height: 42vh;
-  min-height: 140px;
+  gap: 10px;
+  max-height: min(62vh, 680px);
+  min-height: 330px;
   overflow: auto;
-  padding: 8px;
+  padding: 10px;
   user-select: text;
   -webkit-user-select: text;
 }
@@ -237,12 +241,13 @@
   color: var(--text-muted);
   font-size: 12px;
   line-height: 1.5;
+  padding: 2px 0 0 28px;
 }
 
 .codex-excalidraw-panel-message {
   border-radius: 10px;
   line-height: 1.45;
-  padding: 8px;
+  padding: 8px 10px;
   user-select: text;
   -webkit-user-select: text;
 }
@@ -256,12 +261,12 @@
 
 .codex-excalidraw-panel-message-user {
   align-self: flex-end;
-  background: var(--background-primary);
+  background: var(--background-secondary);
   max-width: 92%;
 }
 
 .codex-excalidraw-panel-message-assistant {
-  background: var(--background-primary-alt);
+  background: var(--background-primary);
   border: 1px solid var(--background-modifier-border);
   max-width: 96%;
 }
@@ -282,6 +287,144 @@
   word-break: break-word;
   user-select: text;
   -webkit-user-select: text;
+}
+
+.codex-excalidraw-panel-agent-event {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 16px minmax(0, 1fr);
+  padding: 2px 0 6px;
+}
+
+.codex-excalidraw-panel-agent-rail {
+  display: flex;
+  justify-content: center;
+  padding-top: 6px;
+  position: relative;
+}
+
+.codex-excalidraw-panel-agent-rail::after {
+  background: var(--background-modifier-border);
+  content: "";
+  height: calc(100% + 10px);
+  left: 50%;
+  position: absolute;
+  top: 18px;
+  transform: translateX(-50%);
+  width: 1px;
+}
+
+.codex-excalidraw-panel-agent-marker {
+  background: var(--text-faint);
+  border-radius: 50%;
+  height: 8px;
+  position: relative;
+  width: 8px;
+  z-index: 1;
+}
+
+.codex-excalidraw-panel-agent-event-preparing .codex-excalidraw-panel-agent-marker,
+.codex-excalidraw-panel-agent-event-reading .codex-excalidraw-panel-agent-marker,
+.codex-excalidraw-panel-agent-event-thinking .codex-excalidraw-panel-agent-marker,
+.codex-excalidraw-panel-agent-event-editing .codex-excalidraw-panel-agent-marker,
+.codex-excalidraw-panel-agent-event-verifying .codex-excalidraw-panel-agent-marker {
+  animation: codex-excalidraw-agent-pulse 1.35s ease-in-out infinite;
+  background: var(--interactive-accent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--interactive-accent) 12%, transparent);
+}
+
+.codex-excalidraw-panel-agent-event-complete .codex-excalidraw-panel-agent-marker {
+  background: var(--interactive-success);
+}
+
+.codex-excalidraw-panel-agent-event-failed .codex-excalidraw-panel-agent-marker {
+  background: var(--text-error);
+}
+
+.codex-excalidraw-panel-agent-body {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.codex-excalidraw-panel-agent-kicker {
+  color: var(--text-faint);
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.codex-excalidraw-panel-agent-title {
+  color: var(--text-normal);
+  font-size: 13px;
+  font-weight: 680;
+  line-height: 1.35;
+}
+
+.codex-excalidraw-panel-agent-detail {
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.codex-excalidraw-panel-agent-details {
+  color: var(--text-muted);
+  display: grid;
+  font-size: 11px;
+  gap: 2px;
+  line-height: 1.45;
+  margin-top: 2px;
+  overflow-wrap: anywhere;
+}
+
+.codex-excalidraw-panel-agent-progress {
+  background: var(--background-modifier-border);
+  border-radius: 999px;
+  height: 3px;
+  margin-top: 5px;
+  overflow: hidden;
+}
+
+.codex-excalidraw-panel-agent-progress-fill {
+  background: var(--interactive-accent);
+  height: 100%;
+  transition: width 160ms ease;
+}
+
+.codex-excalidraw-panel-agent-activity {
+  border-top: 1px solid var(--background-modifier-border);
+  color: var(--text-faint);
+  display: grid;
+  font-size: 11px;
+  gap: 3px;
+  line-height: 1.4;
+  margin-top: 6px;
+  padding-top: 7px;
+}
+
+.codex-excalidraw-panel-agent-activity-line {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@keyframes codex-excalidraw-agent-pulse {
+  0% {
+    opacity: 0.55;
+    transform: scale(0.92);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  100% {
+    opacity: 0.55;
+    transform: scale(0.92);
+  }
 }
 
 .codex-excalidraw-panel-composer {
@@ -346,138 +489,14 @@
   opacity: 0.65;
 }
 
-.codex-excalidraw-panel-status {
-  background: var(--background-primary);
+.codex-excalidraw-panel-output {
+  background: var(--background-secondary);
   border: 1px solid var(--background-modifier-border);
   border-radius: 10px;
-  color: var(--text-normal);
-  font-size: 12px;
-  line-height: 1.5;
-  padding: 8px;
-}
-
-.codex-excalidraw-panel-status-running {
-  border-color: var(--interactive-accent);
-}
-
-.codex-excalidraw-panel-status-main {
-  color: var(--text-muted);
-  display: grid;
-  font-size: 11px;
-  gap: 2px;
-  margin-top: 6px;
-}
-
-.codex-excalidraw-panel-status-head {
-  align-items: center;
-  display: flex;
-  justify-content: space-between;
-}
-
-.codex-excalidraw-panel-status-head .codex-excalidraw-panel-section-title {
-  flex-basis: auto;
-}
-
-.codex-excalidraw-panel-status-pill {
-  background: var(--background-secondary);
-  border: 1px solid var(--background-modifier-border);
-  border-radius: 999px;
-  color: var(--text-muted);
-  flex: 0 0 auto;
-  font-size: 11px;
-  line-height: 1;
-  padding: 5px 8px;
-  white-space: nowrap;
-  word-break: keep-all;
-}
-
-.codex-excalidraw-panel-phase-rail {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
-  margin-top: 8px;
-}
-
-.codex-excalidraw-panel-phase {
-  align-items: center;
-  border: 1px solid var(--background-modifier-border);
-  border-radius: 999px;
-  color: var(--text-faint);
-  display: inline-flex;
-  font-size: 11px;
-  gap: 5px;
-  line-height: 1;
-  padding: 5px 7px;
-}
-
-.codex-excalidraw-panel-phase-dot {
-  background: var(--text-faint);
-  border-radius: 50%;
-  height: 6px;
-  width: 6px;
-}
-
-.codex-excalidraw-panel-phase-done {
-  color: var(--text-muted);
-}
-
-.codex-excalidraw-panel-phase-done .codex-excalidraw-panel-phase-dot {
-  background: var(--interactive-success);
-}
-
-.codex-excalidraw-panel-phase-active {
-  background: var(--background-secondary);
-  color: var(--text-normal);
-}
-
-.codex-excalidraw-panel-phase-active .codex-excalidraw-panel-phase-dot {
-  background: var(--interactive-accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--interactive-accent) 18%, transparent);
-}
-
-.codex-excalidraw-panel-phase-detail {
-  color: var(--text-normal);
-  font-size: 12px;
-}
-
-.codex-excalidraw-panel-progress {
-  background: var(--background-modifier-border);
-  border-radius: 999px;
-  height: 6px;
-  margin-top: 8px;
-  overflow: hidden;
-}
-
-.codex-excalidraw-panel-progress-fill {
-  background: var(--interactive-accent);
-  height: 100%;
-  transition: width 160ms ease;
-}
-
-.codex-excalidraw-panel-activity {
-  border-top: 1px solid var(--background-modifier-border);
-  color: var(--text-faint);
-  display: grid;
-  font-size: 11px;
-  gap: 3px;
-  margin-top: 8px;
-  max-height: 86px;
-  overflow: auto;
-  padding-top: 8px;
-}
-
-.codex-excalidraw-panel-activity-line {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.codex-excalidraw-panel-output {
-  border-top: 1px solid var(--background-modifier-border);
   display: grid;
   gap: 6px;
-  margin-top: 8px;
-  padding-top: 8px;
+  margin-left: 24px;
+  padding: 8px;
 }
 
 .codex-excalidraw-panel-output-path {
