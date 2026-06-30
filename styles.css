@@ -30,63 +30,107 @@
 .codex-excalidraw-panel {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
+  height: 100%;
   padding: 14px;
   user-select: text;
   -webkit-user-select: text;
 }
 
 .codex-excalidraw-panel h2 {
+  color: var(--text-normal);
   font-size: 18px;
+  font-weight: 700;
+  line-height: 1.2;
   margin: 0;
 }
 
-.codex-excalidraw-panel-current {
-  border: 1px solid var(--background-modifier-border);
-  border-radius: 6px;
-  color: var(--text-muted);
-  font-size: 12px;
-  line-height: 1.4;
-  padding: 8px;
-  word-break: break-word;
+.codex-excalidraw-panel-header {
+  align-items: flex-start;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
 }
 
-.codex-excalidraw-panel-runtime {
+.codex-excalidraw-panel-identity {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.codex-excalidraw-panel-current {
   color: var(--text-muted);
   font-size: 11px;
   line-height: 1.4;
+  max-height: 44px;
+  overflow: hidden;
+  text-overflow: ellipsis;
   word-break: break-word;
 }
 
-.codex-excalidraw-panel-controls {
-  border: 1px solid var(--background-modifier-border);
-  border-radius: 6px;
-  display: grid;
-  gap: 8px;
-  padding: 8px;
-}
-
-.codex-excalidraw-panel-control-row {
+.codex-excalidraw-panel-meta {
   align-items: center;
-  display: grid;
-  gap: 8px;
-  grid-template-columns: 56px minmax(0, 1fr) 56px;
+  color: var(--text-muted);
+  display: flex;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.4;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.codex-excalidraw-panel-control-row select,
-.codex-excalidraw-panel-control-row input[type="text"],
-.codex-excalidraw-panel-control-row input[type="range"] {
-  width: 100%;
+.codex-excalidraw-panel-toolbar,
+.codex-excalidraw-panel-composer-tools {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.codex-excalidraw-panel-tool-button {
+  align-items: center;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  color: var(--text-muted);
+  display: inline-flex;
+  gap: 5px;
+  height: 30px;
+  justify-content: center;
+  max-width: 100%;
+  padding: 0 8px;
+}
+
+.codex-excalidraw-panel-tool-button:hover:not(:disabled) {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.codex-excalidraw-panel-tool-icon {
+  align-items: center;
+  display: inline-flex;
+  height: 16px;
+  width: 16px;
+}
+
+.codex-excalidraw-panel-tool-label {
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .codex-excalidraw-panel-chat-shell {
-  background: var(--background-secondary);
+  background: var(--background-primary);
   border: 1px solid var(--background-modifier-border);
-  border-radius: 6px;
+  border-radius: 10px;
   display: flex;
   flex-direction: column;
   gap: 8px;
   padding: 8px;
+  min-height: 220px;
 }
 
 .codex-excalidraw-panel-chat-header {
@@ -122,13 +166,13 @@
 }
 
 .codex-excalidraw-panel-chat-log {
-  background: var(--background-primary);
+  background: var(--background-secondary);
   border: 1px solid var(--background-modifier-border);
-  border-radius: 6px;
+  border-radius: 8px;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  max-height: 320px;
+  max-height: 42vh;
   min-height: 140px;
   overflow: auto;
   padding: 8px;
@@ -143,7 +187,7 @@
 }
 
 .codex-excalidraw-panel-message {
-  border-radius: 6px;
+  border-radius: 10px;
   line-height: 1.45;
   padding: 8px;
   user-select: text;
@@ -158,12 +202,15 @@
 }
 
 .codex-excalidraw-panel-message-user {
-  background: var(--background-secondary);
+  align-self: flex-end;
+  background: var(--background-primary);
+  max-width: 92%;
 }
 
 .codex-excalidraw-panel-message-assistant {
   background: var(--background-primary-alt);
   border: 1px solid var(--background-modifier-border);
+  max-width: 96%;
 }
 
 .codex-excalidraw-panel-message-role {
@@ -185,15 +232,30 @@
 }
 
 .codex-excalidraw-panel-composer {
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 12px;
   display: flex;
   flex-direction: column;
   gap: 8px;
+  padding: 8px;
 }
 
-.codex-excalidraw-panel-composer-actions {
-  display: grid;
+.codex-excalidraw-panel-composer-hint {
+  color: var(--text-faint);
+  font-weight: 400;
+}
+
+.codex-excalidraw-panel-composer-bar {
+  align-items: center;
+  display: flex;
   gap: 8px;
-  grid-template-columns: 1fr 1fr;
+  justify-content: space-between;
+}
+
+.codex-excalidraw-panel-composer-send {
+  align-items: center;
+  display: flex;
 }
 
 .codex-excalidraw-panel-section-title {
@@ -211,13 +273,14 @@
 }
 
 .codex-excalidraw-panel-prompt {
-  background: var(--background-primary);
-  border: 1px solid var(--background-modifier-border);
-  border-radius: 6px;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
   font-size: 14px;
   line-height: 1.5;
-  min-height: 120px;
-  padding: 8px;
+  min-height: 96px;
+  outline: none;
+  padding: 4px 2px;
   resize: vertical;
   width: 100%;
 }
@@ -226,40 +289,14 @@
   opacity: 0.65;
 }
 
-.codex-excalidraw-panel-presets {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.codex-excalidraw-panel-presets button {
-  font-size: 12px;
-  padding: 4px 8px;
-}
-
-.codex-excalidraw-panel-actions {
-  display: grid;
-  gap: 8px;
-}
-
-.codex-excalidraw-panel-actions button {
-  justify-content: center;
-  width: 100%;
-}
-
-.codex-excalidraw-panel-actions button:disabled {
-  opacity: 0.55;
-}
-
 .codex-excalidraw-panel-status {
-  background: var(--background-secondary);
+  background: var(--background-primary);
   border: 1px solid var(--background-modifier-border);
-  border-radius: 6px;
+  border-radius: 10px;
   color: var(--text-normal);
   font-size: 12px;
   line-height: 1.5;
   padding: 8px;
-  white-space: pre-wrap;
 }
 
 .codex-excalidraw-panel-status-running {
@@ -267,7 +304,76 @@
 }
 
 .codex-excalidraw-panel-status-main {
+  color: var(--text-muted);
+  display: grid;
+  font-size: 11px;
+  gap: 2px;
   margin-top: 6px;
+}
+
+.codex-excalidraw-panel-status-head {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
+.codex-excalidraw-panel-status-pill {
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 999px;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1;
+  padding: 5px 8px;
+}
+
+.codex-excalidraw-panel-phase-rail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 8px;
+}
+
+.codex-excalidraw-panel-phase {
+  align-items: center;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 999px;
+  color: var(--text-faint);
+  display: inline-flex;
+  font-size: 11px;
+  gap: 5px;
+  line-height: 1;
+  padding: 5px 7px;
+}
+
+.codex-excalidraw-panel-phase-dot {
+  background: var(--text-faint);
+  border-radius: 50%;
+  height: 6px;
+  width: 6px;
+}
+
+.codex-excalidraw-panel-phase-done {
+  color: var(--text-muted);
+}
+
+.codex-excalidraw-panel-phase-done .codex-excalidraw-panel-phase-dot {
+  background: var(--interactive-success);
+}
+
+.codex-excalidraw-panel-phase-active {
+  background: var(--background-secondary);
+  color: var(--text-normal);
+}
+
+.codex-excalidraw-panel-phase-active .codex-excalidraw-panel-phase-dot {
+  background: var(--interactive-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--interactive-accent) 18%, transparent);
+}
+
+.codex-excalidraw-panel-phase-detail {
+  color: var(--text-normal);
+  font-size: 12px;
 }
 
 .codex-excalidraw-panel-progress {
@@ -282,6 +388,24 @@
   background: var(--interactive-accent);
   height: 100%;
   transition: width 160ms ease;
+}
+
+.codex-excalidraw-panel-activity {
+  border-top: 1px solid var(--background-modifier-border);
+  color: var(--text-faint);
+  display: grid;
+  font-size: 11px;
+  gap: 3px;
+  margin-top: 8px;
+  max-height: 86px;
+  overflow: auto;
+  padding-top: 8px;
+}
+
+.codex-excalidraw-panel-activity-line {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .codex-excalidraw-panel-output {
@@ -306,11 +430,25 @@
   grid-template-columns: 1fr 1fr;
 }
 
-.codex-excalidraw-panel-note {
-  color: var(--text-muted);
-  font-size: 12px;
-  line-height: 1.5;
-  margin: 0;
+.codex-excalidraw-panel-send-button {
+  align-items: center;
+  background: var(--interactive-accent);
+  border: none;
+  border-radius: 999px;
+  color: var(--text-on-accent);
+  display: inline-flex;
+  height: 32px;
+  justify-content: center;
+  padding: 0;
+  width: 32px;
+}
+
+.codex-excalidraw-panel-send-button:hover:not(:disabled) {
+  filter: brightness(1.05);
+}
+
+.codex-excalidraw-panel-send-button:disabled {
+  opacity: 0.55;
 }
 
 .codex-excalidraw-settings-runtime {
@@ -321,4 +459,69 @@
   line-height: 1.5;
   margin: 8px 0;
   padding: 8px;
+}
+
+.codex-excalidraw-config-modal {
+  display: grid;
+  gap: 10px;
+}
+
+.codex-excalidraw-config-modal h2 {
+  font-size: 20px;
+  margin: 0 0 2px;
+}
+
+.codex-excalidraw-config-note {
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.45;
+  margin: 0 0 6px;
+}
+
+.codex-excalidraw-modal-value {
+  color: var(--text-muted);
+  font-size: 12px;
+  min-width: 48px;
+  text-align: right;
+}
+
+.codex-excalidraw-modal-footer {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
+.codex-excalidraw-modal-card-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.codex-excalidraw-modal-card {
+  align-items: flex-start;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  display: grid;
+  gap: 4px;
+  justify-items: start;
+  padding: 10px;
+  text-align: left;
+  width: 100%;
+}
+
+.codex-excalidraw-modal-card:hover {
+  background: var(--background-modifier-hover);
+}
+
+.codex-excalidraw-modal-card-title {
+  color: var(--text-normal);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.codex-excalidraw-modal-card-desc {
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.4;
 }

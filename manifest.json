@@ -1,7 +1,7 @@
 {
   "id": "codex-excalidraw",
   "name": "Codex Excalidraw",
-  "version": "0.4.6",
+  "version": "0.4.7",
   "minAppVersion": "1.5.0",
   "description": "Generate Excalidraw diagrams from current notes, selected notes, or folder context.",
   "author": "",

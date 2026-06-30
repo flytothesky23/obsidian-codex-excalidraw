@@ -46,6 +46,29 @@ describe("Codex drawing panel entry points", () => {
     expect(pluginSource).toContain("제한");
   });
 
+  it("keeps dense controls inside modals instead of expanding them in the side panel", () => {
+    expect(pluginSource).toContain("PanelRuntimeStyleModal");
+    expect(pluginSource).toContain("PanelPromptToolsModal");
+    expect(pluginSource).toContain("PanelActionModal");
+    expect(pluginSource).toContain("codex-excalidraw-panel-toolbar");
+    expect(pluginSource).toContain("codex-excalidraw-panel-composer-bar");
+    expect(stylesSource).toContain("codex-excalidraw-config-modal");
+    expect(stylesSource).toContain("codex-excalidraw-modal-card");
+  });
+
+  it("shows Codex CLI phase progress like reading, thinking, editing, and verifying", () => {
+    expect(pluginSource).toContain("PanelPhase");
+    expect(pluginSource).toContain("PANEL_PHASES");
+    expect(pluginSource).toContain("읽기");
+    expect(pluginSource).toContain("생각중");
+    expect(pluginSource).toContain("편집");
+    expect(pluginSource).toContain("검증");
+    expect(pluginSource).toContain("inferCodexPhase");
+    expect(pluginSource).toContain("ingestCodexChunk");
+    expect(stylesSource).toContain("codex-excalidraw-panel-phase-rail");
+    expect(stylesSource).toContain("codex-excalidraw-panel-activity");
+  });
+
   it("uses Codexian settings as the default runtime source", () => {
     expect(settingsSource).toContain('codexSettingsSource: "codexian"');
     expect(settingsSource).toContain("Codexian settings (recommended)");
