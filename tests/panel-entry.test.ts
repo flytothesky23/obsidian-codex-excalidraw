@@ -84,7 +84,8 @@ describe("Codex drawing panel entry points", () => {
     expect(pluginSource).toContain("PanelActionModal");
     expect(pluginSource).toContain("preparePanelModal");
     expect(pluginSource).toContain("codex-excalidraw-panel-toolbar");
-    expect(pluginSource).toContain("codex-excalidraw-panel-composer-bar");
+    expect(pluginSource).toContain("codex-excalidraw-panel-composer-input-row");
+    expect(pluginSource).not.toContain("codex-excalidraw-panel-composer-tools");
     expect(pluginSource).toContain('"모델", () =>');
     expect(pluginSource).toContain('"드로잉 / Canvas 작업"');
     expect(stylesSource).toContain("codex-excalidraw-config-modal");
@@ -156,18 +157,18 @@ describe("Codex drawing panel entry points", () => {
 
   it("lays out panel toolbar buttons as compact single-line controls", () => {
     expect(stylesSource).toContain("grid-template-columns: repeat(3, minmax(0, 1fr))");
-    expect(stylesSource).toContain("grid-template-columns: minmax(0, 1fr) 32px");
+    expect(stylesSource).toContain("grid-template-columns: minmax(0, 1fr) 30px");
     expect(stylesSource).toContain("overflow: hidden");
-    expect(stylesSource).toContain("padding: 10px 12px 42px");
-    expect(stylesSource).toContain("min-height: 74px");
+    expect(stylesSource).toContain("padding: 8px 10px 8px");
+    expect(stylesSource).toContain("min-height: 50px");
     expect(stylesSource).toContain("max-height: none");
-    expect(stylesSource).toContain("flex-wrap: nowrap");
     expect(stylesSource).toContain("white-space: nowrap");
     expect(stylesSource).toContain("word-break: keep-all");
     expect(stylesSource).toContain(".codex-excalidraw-panel-agent-event");
     expect(stylesSource).toContain(".codex-excalidraw-panel-agent-rail");
     expect(stylesSource).toContain(".codex-excalidraw-panel-toolbar .codex-excalidraw-panel-tool-button");
-    expect(stylesSource).toContain(".codex-excalidraw-panel-composer-tools .codex-excalidraw-panel-tool-button");
+    expect(stylesSource).toContain(".codex-excalidraw-panel-composer-input-row");
+    expect(stylesSource).not.toContain(".codex-excalidraw-panel-composer-tools");
     expect(pluginSource).toContain("renderPanelHeaderIllustration");
     expect(stylesSource).toContain("codex-excalidraw-panel-illustration");
     expect(stylesSource).toContain("panel-illustration-spark");

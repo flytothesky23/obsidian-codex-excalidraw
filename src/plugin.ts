@@ -1717,11 +1717,13 @@ class CodexExcalidrawPanelView extends ItemView {
 
   private renderComposer(root: HTMLElement): void {
     const composer = root.createDiv({ cls: "codex-excalidraw-panel-composer" });
-    const label = composer.createDiv({ cls: "codex-excalidraw-panel-section-title", text: "Codex 입력" });
+    const head = composer.createDiv({ cls: "codex-excalidraw-panel-composer-head" });
+    const label = head.createDiv({ cls: "codex-excalidraw-panel-section-title", text: "Codex 입력" });
     label.createSpan({ text: " · " });
     label.createSpan({ cls: "codex-excalidraw-panel-composer-hint", text: "Cmd/Ctrl+Enter 전송" });
 
-    const prompt = composer.createEl("textarea");
+    const inputRow = composer.createDiv({ cls: "codex-excalidraw-panel-composer-input-row" });
+    const prompt = inputRow.createEl("textarea");
     prompt.addClass("codex-excalidraw-panel-prompt");
     prompt.value = this.promptValue;
     prompt.placeholder = "현재 노트나 드로잉을 어떻게 바꿀지 지시하세요";
@@ -1742,20 +1744,7 @@ class CodexExcalidrawPanelView extends ItemView {
     prompt.addEventListener("keydown", submitFromShortcut, { capture: true });
     prompt.addEventListener("keyup", submitFromShortcut, { capture: true });
 
-    const composerBar = composer.createDiv({ cls: "codex-excalidraw-panel-composer-bar" });
-    const leftTools = composerBar.createDiv({ cls: "codex-excalidraw-panel-composer-tools" });
-    this.addToolButton(leftTools, "sliders-horizontal", "모델", () => {
-      new PanelRuntimeStyleModal(this.plugin.app, this.plugin, this).open();
-    }, this.isRunning, "모델 / 스타일");
-    this.addToolButton(leftTools, "wand-sparkles", "프롬프트", () => {
-      new PanelPromptToolsModal(this.plugin.app, this).open();
-    }, this.isRunning, "프롬프트 도구");
-    this.addToolButton(leftTools, "network", "작업", () => {
-      new PanelActionModal(this.plugin.app, this).open();
-    }, this.isRunning, "드로잉 / Canvas 작업");
-
-    const rightTools = composerBar.createDiv({ cls: "codex-excalidraw-panel-composer-send" });
-    const sendButton = rightTools.createEl("button", {
+    const sendButton = inputRow.createEl("button", {
       cls: "codex-excalidraw-panel-send-button",
       attr: {
         "aria-label": "대화 보내기",

@@ -35,7 +35,7 @@
   height: 100%;
   min-height: 0;
   overflow: hidden;
-  padding: 10px 12px 42px;
+  padding: 8px 10px 8px;
   scrollbar-gutter: stable;
   user-select: text;
   -webkit-user-select: text;
@@ -180,22 +180,6 @@
   width: 100%;
 }
 
-.codex-excalidraw-panel-composer-tools {
-  align-items: center;
-  display: flex;
-  flex: 1 1 auto;
-  flex-wrap: nowrap;
-  gap: 6px;
-  min-width: 0;
-  overflow-x: auto;
-  padding-bottom: 1px;
-  scrollbar-width: none;
-}
-
-.codex-excalidraw-panel-composer-tools::-webkit-scrollbar {
-  display: none;
-}
-
 .codex-excalidraw-panel-tool-button {
   align-items: center;
   background: var(--background-secondary);
@@ -225,10 +209,6 @@
 
 .codex-excalidraw-panel-toolbar .codex-excalidraw-panel-tool-button {
   width: 100%;
-}
-
-.codex-excalidraw-panel-composer-tools .codex-excalidraw-panel-tool-button {
-  max-width: 132px;
 }
 
 .codex-excalidraw-panel-tool-icon {
@@ -521,9 +501,15 @@
   border-radius: 12px;
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: 5px;
   margin-bottom: 0;
-  padding: 8px;
+  padding: 7px;
+}
+
+.codex-excalidraw-panel-composer-head {
+  align-items: baseline;
+  display: flex;
+  min-width: 0;
 }
 
 .codex-excalidraw-panel-composer-hint {
@@ -531,18 +517,11 @@
   font-weight: 400;
 }
 
-.codex-excalidraw-panel-composer-bar {
-  align-items: center;
+.codex-excalidraw-panel-composer-input-row {
+  align-items: end;
   display: grid;
-  gap: 7px;
-  grid-template-columns: minmax(0, 1fr) 32px;
-  min-width: 0;
-}
-
-.codex-excalidraw-panel-composer-send {
-  align-items: center;
-  display: flex;
-  justify-content: center;
+  gap: 6px;
+  grid-template-columns: minmax(0, 1fr) 30px;
   min-width: 0;
 }
 
@@ -566,9 +545,10 @@
   border-radius: 8px;
   font-size: 13px;
   line-height: 1.42;
-  min-height: 74px;
+  max-height: 96px;
+  min-height: 50px;
   outline: none;
-  padding: 4px 2px;
+  padding: 2px 0;
   resize: vertical;
   width: 100%;
 }
@@ -638,6 +618,7 @@
   flex: 0 0 30px;
   height: 30px;
   justify-content: center;
+  margin-bottom: 2px;
   padding: 0;
   width: 30px;
 }
