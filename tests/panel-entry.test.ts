@@ -128,12 +128,20 @@ describe("Codex drawing panel entry points", () => {
     expect(pluginSource).toContain("Create an editable architecture/SVG-style Excalidraw diagram");
     expect(pluginSource).toContain("Design pass first");
     expect(pluginSource).toContain("Asset pass next");
+    expect(pluginSource).toContain("Connector pass");
+    expect(pluginSource).toContain("라이브러리 미사용 사유");
     expect(pluginSource).toContain("No generic filler labels");
     expect(pluginSource).toContain("아이콘");
     expect(pluginSource).toContain("콜아웃");
     expect(librariesSource).toContain("EXCALIDRAW_LIBRARY_REGISTRY_URL");
     expect(librariesSource).toContain("Microsoft Fabric Architecture Icons");
     expect(librariesSource).toContain("mwc360/microsoft-fabric-architecture-icons.excalidrawlib");
+    expect(librariesSource).toContain("Tools");
+    expect(librariesSource).toContain("pixelass/tools.excalidrawlib");
+    expect(librariesSource).toContain("Architecture floor plan symbols");
+    expect(librariesSource).toContain("Arqtangeles/architecture.excalidrawlib");
+    expect(librariesSource).toContain("Library Element Insertion Protocol");
+    expect(librariesSource).toContain("Clean Connector Contract");
     expect(librariesSource).toContain("Software Architecture");
   });
 

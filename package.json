@@ -1,6 +1,6 @@
 {
   "name": "obsidian-codex-excalidraw",
-  "version": "0.4.17",
+  "version": "0.4.18",
   "description": "Generate Excalidraw maps from Obsidian notes, selected files, or folders.",
   "main": "main.js",
   "scripts": {

@@ -40,6 +40,21 @@ describe("Excalidraw asset library selection", () => {
     expect(names).toContain("Information Architecture");
   });
 
+  it("selects field-work and evidence libraries for construction daily notes", () => {
+    const libraries = selectExcalidrawAssetLibraries([
+      buildNoteContext({
+        path: "공사일보/2026-06-30_지수면_지수로708_공장증축공사_공사일보.md",
+        content: "# 공장증축 공사일보\n현장사진 8장, 기초 콘크리트, 펜스, 전기설비 안전거리, 관리 체크, 후속 부대공사 일정을 검토한다.",
+      }),
+    ]);
+    const names = libraries.map((library) => library.name);
+
+    expect(names).toContain("Tools");
+    expect(names).toContain("Architecture floor plan symbols");
+    expect(names).toContain("IT icons");
+    expect(names).toContain("System Icons");
+  });
+
   it("summarizes v2 excalidraw library item names for Codex prompts", () => {
     const itemNames = summarizeExcalidrawLibraryItems(
       JSON.stringify({
@@ -72,6 +87,9 @@ describe("Excalidraw asset library selection", () => {
     ]);
 
     expect(brief).toContain("# Excalidraw Asset Libraries");
+    expect(brief).toContain("Library Element Insertion Protocol");
+    expect(brief).toContain("Clean Connector Contract");
+    expect(brief).toContain("라이브러리 사용:");
     expect(brief).toContain("Cache path: Codex Maps/_libraries/fabric.excalidrawlib");
     expect(brief).toContain("Candidate item names: Fabric, OneLake, Power BI");
   });

@@ -1245,10 +1245,11 @@ function panelActionPrompt(action: CodexPanelAction): string {
       return [
         "Create an editable architecture/SVG-style Excalidraw diagram, not another handwritten study-note box map.",
         "Design pass first: identify the source domain, actors, systems/assets, decisions, risks, verification points, and the one flow direction a reader should follow.",
-        "Asset pass next: read the prepared Excalidraw library cache when available. Choose source-specific icon/glyph candidates such as Fabric, OneLake, GitHub, Python, User, Device, Server, File, Lock, Database, or Decision. If an exact library item is not useful, draw a simplified editable glyph with Excalidraw primitives.",
+        "Asset pass next: read the prepared Excalidraw library cache files. Prefer copied editable library item elements over primitive self-drawn glyphs. Use at least three library items when plausible matches exist; otherwise report `라이브러리 미사용 사유:`.",
         "Layout pass: use 1-3 lanes/zones, 5-9 semantic nodes, small icon/glyph clusters, 2-4 callouts, and relationship labels on ambiguous arrows.",
+        "Connector pass: choose one primary flow direction, connect from edge ports, route arrows through gutters with orthogonal/elbow paths, and avoid diagonal cross-zone spaghetti.",
         "No generic filler labels such as 정렬, 위계, 간결. Every visible label must name a real source concept, relationship, risk, or verification check.",
-        "Place the title top-left with clear margin. Keep all text inside boxes, manually line-break long Korean labels, and route arrows around labels.",
+        "Place the title top-left with clear margin. Keep all text inside boxes, manually line-break long Korean labels, and route arrows around labels and other arrows.",
         "The result must remain editable Excalidraw JSON, not a pasted SVG, PNG, screenshot, or single flattened image.",
       ].join("\n");
     case "revise-active":

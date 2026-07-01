@@ -72,10 +72,12 @@ describe("Codex drawing brief", () => {
 
     expect(brief).toContain("Architecture / SVG-System Diagram Mode");
     expect(brief).toContain("Asset pass");
-    expect(brief).toContain("editable vector glyph vocabulary");
+    expect(brief).toContain("prepared Excalidraw library cache");
     expect(brief).toContain("1-3 lanes or zones");
+    expect(brief).toContain("orthogonal/elbow connectors");
     expect(brief).toContain("Verification pass");
     expect(brief).toContain("Title must be top-left anchored");
+    expect(brief).toContain("library items used");
     expect(brief).not.toContain("graduate-level teacher");
     expect(brief).not.toContain("single simplest visual form");
   });
