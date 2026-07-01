@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildDiagram, defaultDiagramOptions } from "../src/diagram";
+import { inspectExcalidrawMarkdown } from "../src/excalidraw";
 import { buildNoteContext } from "../src/markdown";
 
 describe("diagram generation", () => {
@@ -29,6 +30,21 @@ describe("diagram generation", () => {
     const parsed = JSON.parse(json ?? "{}");
     expect(parsed.elements.length).toBeGreaterThan(0);
     expect(result.relationCount).toBe(1);
+  });
+
+  it("inspects generated Excalidraw Markdown before reporting completion", () => {
+    const result = buildDiagram(
+      [buildNoteContext({ path: "A.md", content: "# A\nLinks to [[B]]." })],
+      defaultDiagramOptions("Inspectable", "Unit test"),
+    );
+    const stats = inspectExcalidrawMarkdown(result.markdown);
+
+    expect(stats.elementCount).toBeGreaterThan(0);
+    expect(stats.textCount).toBe(stats.markdownTextBlockCount);
+    expect(stats.arrowCount).toBeGreaterThan(0);
+    expect(stats.visibleTextCharacters).toBeGreaterThan(10);
+    expect(stats.maxX).toBeGreaterThan(stats.minX);
+    expect(stats.maxY).toBeGreaterThan(stats.minY);
   });
 
   it("keeps Excalidraw text block ids compatible with Obsidian Excalidraw", () => {

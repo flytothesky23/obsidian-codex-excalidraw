@@ -6,6 +6,7 @@ import {
   normalizePath,
   Notice,
   Plugin,
+  requestUrl,
   Setting,
   setIcon,
   TAbstractFile,
@@ -17,7 +18,7 @@ import { lstatSync } from "fs";
 import { join } from "path";
 import { assertReadableCanvas, buildCanvas, parseAndValidateCanvas } from "./canvas";
 import { buildCanvasBrief } from "./canvas-brief";
-import { buildCodexBrief } from "./codex-brief";
+import { buildCodexBrief, type CodexBriefOptions } from "./codex-brief";
 import { runCodexExec } from "./codex-cli";
 import {
   getCodexianPlugin,
@@ -25,7 +26,21 @@ import {
   type CodexRuntimeConfig,
 } from "./codexian-bridge";
 import { buildDiagram, defaultDiagramOptions } from "./diagram";
-import { createScene, renderExcalidrawMarkdown } from "./excalidraw";
+import {
+  buildExcalidrawAssetCatalogMarkdown,
+  excalidrawLibraryCacheName,
+  excalidrawLibraryRawUrl,
+  formatExcalidrawAssetLibraryBrief,
+  selectExcalidrawAssetLibraries,
+  summarizeExcalidrawLibraryItems,
+  type CachedExcalidrawAssetLibrary,
+} from "./excalidraw-libraries";
+import {
+  createScene,
+  inspectExcalidrawMarkdown,
+  renderExcalidrawMarkdown,
+  type ExcalidrawInspectionStats,
+} from "./excalidraw";
 import { buildNoteContext, truncate } from "./markdown";
 import { FolderSuggestModal, MultiFileModal } from "./modals";
 import {
@@ -550,7 +565,7 @@ export default class CodexExcalidrawPlugin extends Plugin {
     const files = await this.expandLinkedNotes(active);
     const contexts = await this.readNoteContexts(files);
     const targetPath = await this.nextDrawingPath(active.basename, this.getCodexWritableOutputFolder());
-    const brief = buildCodexBrief(contexts, targetPath, this.codexBriefOptions());
+    const brief = buildCodexBrief(contexts, targetPath, this.codexBriefOptions("study-note"));
     await navigator.clipboard.writeText(brief);
     new Notice(`Copied Codex drawing brief for ${contexts.length} note(s).`);
   }
@@ -623,8 +638,12 @@ export default class CodexExcalidrawPlugin extends Plugin {
     }
 
     new Notice(`Codex CLI is composing ${actionLabel(action)}...`);
+    const assetLibraryBrief = action === "svg-sketch"
+      ? await this.prepareExcalidrawAssetLibraries(contexts, targetPath, onUpdate)
+      : "";
     const prompt = [
-      buildCodexBrief(contexts, targetPath, this.codexBriefOptions()),
+      buildCodexBrief(contexts, targetPath, this.codexBriefOptions(action)),
+      assetLibraryBrief,
       "",
       "# Panel Action",
       "",
@@ -638,9 +657,11 @@ export default class CodexExcalidrawPlugin extends Plugin {
       "",
       "Read the source Markdown files from disk first.",
       `Edit only this target drawing file: ${targetPath}`,
-      "Keep the drawing as editable Excalidraw Markdown. Do not create unrelated files.",
+      action === "svg-sketch"
+        ? "Keep the drawing as editable Excalidraw Markdown. Do not create unrelated files. The plugin already prepared any listed Excalidraw library cache files; read them but do not rewrite the cache."
+        : "Keep the drawing as editable Excalidraw Markdown. Do not create unrelated files.",
       "If the target file contains no useful elements, build the diagram from scratch.",
-      "After editing, report a concise summary of the visual logic you created and which source claims anchor it.",
+      "After editing, report a concise summary of the visual logic you created, which source claims anchor it, and what layout/text-overflow checks you performed.",
     ].join("\n");
 
     const result = await this.runCodex(prompt, {
@@ -648,8 +669,10 @@ export default class CodexExcalidrawPlugin extends Plugin {
       onStderr: (chunk) => onUpdate?.(chunk, "stderr"),
     });
     const summary = summarizeCodexResult(result.stdout || result.stderr);
-    new Notice(`Codex CLI finished. ${summary || "Drawing refined."}`, 10000);
-    return summary;
+    const stats = await this.validateDrawingTarget(targetPath);
+    const verified = formatDrawingVerification(action, stats);
+    new Notice(`Codex CLI finished. ${summary || "Drawing refined."} ${verified}`, 10000);
+    return [summary, verified].filter(Boolean).join("\n");
   }
 
   private async reviseActiveDrawingWithCodex(
@@ -786,11 +809,12 @@ export default class CodexExcalidrawPlugin extends Plugin {
     return [summary, verified].filter(Boolean).join("\n");
   }
 
-  private codexBriefOptions() {
+  private codexBriefOptions(action: CodexPanelAction = "study-note"): CodexBriefOptions {
     return {
       visualTheme: this.settings.visualTheme,
       handwritingFontFamily: this.settings.handwritingFontFamily,
       studyNoteFontScale: this.settings.studyNoteFontScale,
+      diagramMode: action === "svg-sketch" ? "svg-system" : "study-note",
     };
   }
 
@@ -845,6 +869,63 @@ export default class CodexExcalidrawPlugin extends Plugin {
     const raw = await this.app.vault.adapter.read(path);
     const canvas = parseAndValidateCanvas(raw);
     return assertReadableCanvas(canvas);
+  }
+
+  private async validateDrawingTarget(path: string) {
+    const raw = await this.app.vault.adapter.read(path);
+    return inspectExcalidrawMarkdown(raw);
+  }
+
+  private async prepareExcalidrawAssetLibraries(
+    contexts: NoteContext[],
+    targetPath: string,
+    onUpdate?: (chunk: string, stream: "stdout" | "stderr") => void,
+  ): Promise<string> {
+    const libraries = selectExcalidrawAssetLibraries(contexts);
+    if (!libraries.length) return formatExcalidrawAssetLibraryBrief([]);
+
+    const targetFolder = targetPath.includes("/") ? targetPath.slice(0, targetPath.lastIndexOf("/")) : "";
+    const libraryFolder = normalizePath(`${targetFolder || this.getCodexWritableOutputFolder()}/_libraries`);
+    await this.ensureFolder(libraryFolder);
+
+    const cached: CachedExcalidrawAssetLibrary[] = [];
+    for (const spec of libraries) {
+      const rawUrl = excalidrawLibraryRawUrl(spec);
+      const path = normalizePath(`${libraryFolder}/${excalidrawLibraryCacheName(spec)}`);
+      let status: CachedExcalidrawAssetLibrary["status"] = "catalog-only";
+      let raw = "";
+      let error = "";
+
+      try {
+        if (this.app.vault.getAbstractFileByPath(path) instanceof TFile) {
+          raw = await this.app.vault.adapter.read(path);
+          status = "cached";
+        } else {
+          onUpdate?.(`asset library: fetching ${spec.name}\n`, "stdout");
+          const response = await requestUrl({ url: rawUrl });
+          raw = response.text;
+          await this.app.vault.adapter.write(path, raw);
+          status = "downloaded";
+        }
+      } catch (caught) {
+        error = caught instanceof Error ? caught.message : String(caught);
+        status = "failed";
+      }
+
+      cached.push({
+        spec,
+        path,
+        rawUrl,
+        itemNames: summarizeExcalidrawLibraryItems(raw, spec.itemNames),
+        status,
+        error,
+      });
+    }
+
+    const catalogPath = normalizePath(`${libraryFolder}/catalog.md`);
+    await this.app.vault.adapter.write(catalogPath, buildExcalidrawAssetCatalogMarkdown(cached));
+    onUpdate?.(`asset library: catalog ${catalogPath}\n`, "stdout");
+    return formatExcalidrawAssetLibraryBrief(cached);
   }
 
   private async readNoteContexts(files: TFile[], truncateContent = true): Promise<NoteContext[]> {
@@ -1113,6 +1194,29 @@ function extractOutputPath(value: string): string {
   return match?.[1]?.trim() ?? "";
 }
 
+function formatDrawingVerification(action: CodexPanelAction, stats: ExcalidrawInspectionStats): string {
+  const bounds = `${stats.minX},${stats.minY}~${stats.maxX},${stats.maxY}`;
+  if (action === "svg-sketch") {
+    return [
+      `검증: 요소 ${stats.elementCount}개`,
+      `텍스트 ${stats.textCount}/${stats.markdownTextBlockCount}개`,
+      `벡터/아이콘 후보 ${stats.nonTextVectorCount}개`,
+      `화살표 ${stats.arrowCount}개`,
+      `visible text ${stats.visibleTextCharacters}자`,
+      `폰트 ${stats.minFontSize}-${stats.maxFontSize}`,
+      `bounds ${bounds}`,
+    ].join(", ");
+  }
+  return [
+    `검증: 요소 ${stats.elementCount}개`,
+    `텍스트 ${stats.textCount}/${stats.markdownTextBlockCount}개`,
+    `사각형 ${stats.rectangleCount}개`,
+    `화살표 ${stats.arrowCount}개`,
+    `visible text ${stats.visibleTextCharacters}자`,
+    `bounds ${bounds}`,
+  ].join(", ");
+}
+
 function panelActionPrompt(action: CodexPanelAction): string {
   switch (action) {
     case "study-note":
@@ -1139,10 +1243,13 @@ function panelActionPrompt(action: CodexPanelAction): string {
       ].join("\n");
     case "svg-sketch":
       return [
-        "Create an editable Excalidraw drawing with SVG-like diagram discipline: clean geometry, strong hierarchy, minimal color, and readable Korean labels.",
-        "Use spatial hierarchy before color. Use no more than three accent colors and no decorative fills unless they encode meaning.",
-        "Every shape must have a reason: source, concept, decision, risk, evidence, or next action.",
-        "The result must remain editable Excalidraw, not a pasted image.",
+        "Create an editable architecture/SVG-style Excalidraw diagram, not another handwritten study-note box map.",
+        "Design pass first: identify the source domain, actors, systems/assets, decisions, risks, verification points, and the one flow direction a reader should follow.",
+        "Asset pass next: read the prepared Excalidraw library cache when available. Choose source-specific icon/glyph candidates such as Fabric, OneLake, GitHub, Python, User, Device, Server, File, Lock, Database, or Decision. If an exact library item is not useful, draw a simplified editable glyph with Excalidraw primitives.",
+        "Layout pass: use 1-3 lanes/zones, 5-9 semantic nodes, small icon/glyph clusters, 2-4 callouts, and relationship labels on ambiguous arrows.",
+        "No generic filler labels such as 정렬, 위계, 간결. Every visible label must name a real source concept, relationship, risk, or verification check.",
+        "Place the title top-left with clear margin. Keep all text inside boxes, manually line-break long Korean labels, and route arrows around labels.",
+        "The result must remain editable Excalidraw JSON, not a pasted SVG, PNG, screenshot, or single flattened image.",
       ].join("\n");
     case "revise-active":
       return [
@@ -2307,8 +2414,8 @@ const PANEL_ACTION_CARDS: PanelActionCardSpec[] = [
     icon: "shapes",
     badge: "Excalidraw",
     previewKind: "svg",
-    previewLines: ["정렬", "위계", "간결"],
-    description: "기하학적으로 정돈된 SVG식 Excalidraw 도식을 생성합니다.",
+    previewLines: ["아이콘", "흐름", "콜아웃"],
+    description: "라이브러리 자산·존·연결 라벨을 참고한 아키텍처형 Excalidraw 도식을 생성합니다.",
   },
   {
     id: "copy-brief",

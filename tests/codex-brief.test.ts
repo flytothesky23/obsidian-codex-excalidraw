@@ -57,4 +57,26 @@ describe("Codex drawing brief", () => {
     expect(brief).toContain("Minimum readable text size 33");
     expect(brief).toContain("fontFamily 4");
   });
+
+  it("uses a separate architecture/SVG-system contract for SVG-style diagrams", () => {
+    const brief = buildCodexBrief(
+      [
+        buildNoteContext({
+          path: "21_업무노트/정보기술/Odysseus/05 한글화 로드맵.md",
+          content: "# Odysseus 한글화 로드맵\nCodex CLI, OAuth, GitHub, Windows 설치 흐름을 설명한다.",
+        }),
+      ],
+      "Codex Maps/Odysseus SVG식 도식.excalidraw.md",
+      { diagramMode: "svg-system", visualTheme: "whiteboard" },
+    );
+
+    expect(brief).toContain("Architecture / SVG-System Diagram Mode");
+    expect(brief).toContain("Asset pass");
+    expect(brief).toContain("editable vector glyph vocabulary");
+    expect(brief).toContain("1-3 lanes or zones");
+    expect(brief).toContain("Verification pass");
+    expect(brief).toContain("Title must be top-left anchored");
+    expect(brief).not.toContain("graduate-level teacher");
+    expect(brief).not.toContain("single simplest visual form");
+  });
 });

@@ -164,8 +164,96 @@ export function renderExcalidrawMarkdown(scene: ExcalidrawScene, options: {
   ].join("\n");
 }
 
+export interface ExcalidrawInspectionStats {
+  elementCount: number;
+  textCount: number;
+  markdownTextBlockCount: number;
+  rectangleCount: number;
+  arrowCount: number;
+  nonTextVectorCount: number;
+  visibleTextCharacters: number;
+  minFontSize: number;
+  maxFontSize: number;
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+}
+
+export function inspectExcalidrawMarkdown(markdown: string): ExcalidrawInspectionStats {
+  const drawingJson = markdown.match(/## Drawing\s*```json\s*([\s\S]*?)\s*```/)?.[1];
+  if (!drawingJson) {
+    throw new Error("Missing Excalidraw `## Drawing` JSON fence.");
+  }
+
+  const parsed = JSON.parse(drawingJson) as { elements?: unknown[] };
+  const elements = Array.isArray(parsed.elements)
+    ? parsed.elements.filter(isVisibleExcalidrawElement)
+    : [];
+  if (elements.length === 0) {
+    throw new Error("Excalidraw drawing JSON contains no visible elements.");
+  }
+
+  const textElements = elements.filter(isTextInspectionElement);
+  const markdownTextBlockCount = countMarkdownTextBlocks(markdown);
+  if (textElements.length !== markdownTextBlockCount) {
+    throw new Error(
+      `Text element mismatch: JSON has ${textElements.length}, Markdown has ${markdownTextBlockCount}.`,
+    );
+  }
+
+  const bounds = elements.reduce(
+    (acc, element) => ({
+      minX: Math.min(acc.minX, element.x),
+      minY: Math.min(acc.minY, element.y),
+      maxX: Math.max(acc.maxX, element.x + Math.abs(element.width)),
+      maxY: Math.max(acc.maxY, element.y + Math.abs(element.height)),
+    }),
+    { minX: Number.POSITIVE_INFINITY, minY: Number.POSITIVE_INFINITY, maxX: Number.NEGATIVE_INFINITY, maxY: Number.NEGATIVE_INFINITY },
+  );
+  const fontSizes = textElements
+    .map((element) => element.fontSize)
+    .filter((fontSize) => Number.isFinite(fontSize));
+
+  return {
+    elementCount: elements.length,
+    textCount: textElements.length,
+    markdownTextBlockCount,
+    rectangleCount: elements.filter((element) => element.type === "rectangle").length,
+    arrowCount: elements.filter((element) => element.type === "arrow").length,
+    nonTextVectorCount: elements.filter((element) => element.type !== "text").length,
+    visibleTextCharacters: textElements.reduce(
+      (total, element) => total + (element.rawText || element.text || "").replace(/\s+/g, "").length,
+      0,
+    ),
+    minFontSize: fontSizes.length ? Math.min(...fontSizes) : 0,
+    maxFontSize: fontSizes.length ? Math.max(...fontSizes) : 0,
+    minX: Math.round(bounds.minX),
+    minY: Math.round(bounds.minY),
+    maxX: Math.round(bounds.maxX),
+    maxY: Math.round(bounds.maxY),
+  };
+}
+
 export function stableId(prefix: string, value: string): string {
   return `${prefix}-${hash(value).toString(36)}`;
+}
+
+interface ExcalidrawInspectionElement {
+  id?: unknown;
+  type?: unknown;
+  isDeleted?: unknown;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+interface ExcalidrawTextInspectionElement extends ExcalidrawInspectionElement {
+  type: "text";
+  text?: string;
+  rawText?: string;
+  fontSize: number;
 }
 
 function base(
@@ -219,6 +307,27 @@ function escapeTextElement(value: string): string {
 
 function escapeYamlString(value: string): string {
   return value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+}
+
+function isVisibleExcalidrawElement(value: unknown): value is ExcalidrawInspectionElement {
+  if (!value || typeof value !== "object") return false;
+  const element = value as Record<string, unknown>;
+  return element.isDeleted !== true &&
+    typeof element.type === "string" &&
+    typeof element.x === "number" &&
+    typeof element.y === "number" &&
+    typeof element.width === "number" &&
+    typeof element.height === "number";
+}
+
+function isTextInspectionElement(value: ExcalidrawInspectionElement): value is ExcalidrawTextInspectionElement {
+  return value.type === "text" &&
+    typeof (value as unknown as Record<string, unknown>).fontSize === "number";
+}
+
+function countMarkdownTextBlocks(markdown: string): number {
+  const section = markdown.match(/## Text Elements\s*([\s\S]*?)\n\s*## Drawing/)?.[1] ?? "";
+  return [...section.matchAll(/\^([0-9A-Za-z]{8})\b/g)].length;
 }
 
 function normalizeSceneElementIds(scene: ExcalidrawScene): ExcalidrawScene {

@@ -118,6 +118,25 @@ describe("Codex drawing panel entry points", () => {
     expect(stylesSource).toContain("text-overflow: ellipsis");
   });
 
+  it("routes SVG-style diagrams through an asset-library and architecture workflow", () => {
+    const librariesSource = readFileSync("src/excalidraw-libraries.ts", "utf8");
+
+    expect(pluginSource).toContain("prepareExcalidrawAssetLibraries");
+    expect(pluginSource).toContain("selectExcalidrawAssetLibraries");
+    expect(pluginSource).toContain("formatExcalidrawAssetLibraryBrief");
+    expect(pluginSource).toContain("diagramMode: action === \"svg-sketch\" ? \"svg-system\" : \"study-note\"");
+    expect(pluginSource).toContain("Create an editable architecture/SVG-style Excalidraw diagram");
+    expect(pluginSource).toContain("Design pass first");
+    expect(pluginSource).toContain("Asset pass next");
+    expect(pluginSource).toContain("No generic filler labels");
+    expect(pluginSource).toContain("아이콘");
+    expect(pluginSource).toContain("콜아웃");
+    expect(librariesSource).toContain("EXCALIDRAW_LIBRARY_REGISTRY_URL");
+    expect(librariesSource).toContain("Microsoft Fabric Architecture Icons");
+    expect(librariesSource).toContain("mwc360/microsoft-fabric-architecture-icons.excalidrawlib");
+    expect(librariesSource).toContain("Software Architecture");
+  });
+
   it("submits chat from Cmd/Ctrl+Enter across keyboard event variants", () => {
     expect(pluginSource).toContain("function isSubmitShortcut");
     expect(pluginSource).toContain('event.code === "NumpadEnter"');
