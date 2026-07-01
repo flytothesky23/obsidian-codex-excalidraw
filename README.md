@@ -21,6 +21,8 @@ This plugin also supports Obsidian Canvas JSON workflows inspired by the Claude 
 The generated files are `.excalidraw.md` Markdown drawings compatible with the Obsidian Excalidraw plugin.
 The non-Codex commands create a deterministic local draft. The Codex CLI commands create the same draft first, then run `codex exec` from the vault root to refine only the generated drawing file.
 
+If the output folder is a Google Drive CloudStorage folder reached through a vault symlink, Codex may not be allowed to write that symlink target directly. In that case the plugin creates a temporary working copy under `Codex Maps/_codex_bridge`, asks Codex to edit only that copy, validates the result, then writes the validated file back to the original Google Drive location through Obsidian's vault adapter. The final drawing or Canvas still stays in the configured output folder.
+
 ## Codex side panel
 
 The plugin opens `Codex Drawing` in the right sidebar on startup by default. The left ribbon icon also opens the panel. Use it to drive drawing work with short instructions:

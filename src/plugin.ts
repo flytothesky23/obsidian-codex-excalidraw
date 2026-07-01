@@ -64,7 +64,14 @@ import type { NoteContext, NoteLink } from "./types";
 
 const CODEX_EXCALIDRAW_PANEL_VIEW = "codex-excalidraw-panel";
 const MARKDOWN_REVISION_INBOX_FOLDER = "00_수집함";
+const CODEX_BRIDGE_FOLDER = "Codex Maps/_codex_bridge";
 type PanelActionCardId = CodexPanelAction | "basic-study-note" | "copy-brief";
+
+interface CodexWritableTarget {
+  finalPath: string;
+  codexPath: string;
+  bridged: boolean;
+}
 
 export default class CodexExcalidrawPlugin extends Plugin {
   settings: CodexExcalidrawSettings = DEFAULT_SETTINGS;
@@ -316,8 +323,7 @@ export default class CodexExcalidrawPlugin extends Plugin {
       title,
       sourcePaths: contexts.map((context) => context.path),
     });
-    const outputFolder = this.getCodexWritableOutputFolder();
-    this.noticeWhenUsingSafeOutputFolder(outputFolder);
+    const outputFolder = this.getConfiguredOutputFolder();
     const path = await this.writeDrawing(blankMarkdown, label, outputFolder);
 
     new Notice(`${actionLabel(action)} target created. Codex CLI is reading ${contexts.length} source note(s).`, 7000);
@@ -451,7 +457,7 @@ export default class CodexExcalidrawPlugin extends Plugin {
   }
 
   getPanelVisualOutputFolder(): string {
-    return this.getCodexWritableOutputFolder();
+    return this.getConfiguredOutputFolder();
   }
 
   getPanelMarkdownTemplateFolder(): string {
@@ -488,8 +494,7 @@ export default class CodexExcalidrawPlugin extends Plugin {
     const contexts = await this.readNoteContexts(capped, !runCodex);
     const title = `${label} Obsidian Canvas`;
     const result = buildCanvas(contexts, title);
-    const outputFolder = runCodex ? this.getCodexWritableOutputFolder() : this.settings.outputFolder;
-    if (runCodex) this.noticeWhenUsingSafeOutputFolder(outputFolder);
+    const outputFolder = this.getConfiguredOutputFolder();
     const path = await this.writeCanvas(result.json, label, outputFolder);
     await this.validateCanvasTarget(path);
     new Notice(`Created ${path} with ${result.nodeCount} canvas nodes and ${result.edgeCount} edges.`, 7000);
@@ -523,8 +528,7 @@ export default class CodexExcalidrawPlugin extends Plugin {
         title,
         sourcePaths: contexts.map((context) => context.path),
       });
-      const outputFolder = this.getCodexWritableOutputFolder();
-      this.noticeWhenUsingSafeOutputFolder(outputFolder);
+      const outputFolder = this.getConfiguredOutputFolder();
       path = await this.writeDrawing(blankMarkdown, label, outputFolder);
       new Notice(
         `Created semantic Codex target ${path}. Codex CLI is reading ${contexts.length} source note(s).`,
@@ -637,13 +641,16 @@ export default class CodexExcalidrawPlugin extends Plugin {
       throw new Error("Codex CLI refinement requires the desktop filesystem adapter.");
     }
 
+    const target = await this.prepareCodexWritableTarget(targetPath);
     new Notice(`Codex CLI is composing ${actionLabel(action)}...`);
     const assetLibraryBrief = action === "svg-sketch"
-      ? await this.prepareExcalidrawAssetLibraries(contexts, targetPath, onUpdate)
+      ? await this.prepareExcalidrawAssetLibraries(contexts, target.codexPath, onUpdate)
       : "";
     const prompt = [
-      buildCodexBrief(contexts, targetPath, this.codexBriefOptions(action)),
+      buildCodexBrief(contexts, target.codexPath, this.codexBriefOptions(action)),
       assetLibraryBrief,
+      "",
+      ...this.codexBridgePrompt(target),
       "",
       "# Panel Action",
       "",
@@ -656,7 +663,7 @@ export default class CodexExcalidrawPlugin extends Plugin {
       "# Execution",
       "",
       "Read the source Markdown files from disk first.",
-      `Edit only this target drawing file: ${targetPath}`,
+      `Edit only this target drawing file: ${target.codexPath}`,
       action === "svg-sketch"
         ? "Keep the drawing as editable Excalidraw Markdown. Do not create unrelated files. The plugin already prepared any listed Excalidraw library cache files; read them but do not rewrite the cache."
         : "Keep the drawing as editable Excalidraw Markdown. Do not create unrelated files.",
@@ -669,7 +676,8 @@ export default class CodexExcalidrawPlugin extends Plugin {
       onStderr: (chunk) => onUpdate?.(chunk, "stderr"),
     });
     const summary = summarizeCodexResult(result.stdout || result.stderr);
-    const stats = await this.validateDrawingTarget(targetPath);
+    const stats = await this.validateDrawingTarget(target.codexPath);
+    await this.finalizeCodexWritableTarget(target);
     const verified = formatDrawingVerification(action, stats);
     new Notice(`Codex CLI finished. ${summary || "Drawing refined."} ${verified}`, 10000);
     return [summary, verified].filter(Boolean).join("\n");
@@ -685,11 +693,14 @@ export default class CodexExcalidrawPlugin extends Plugin {
       throw new Error("Codex CLI revision requires the desktop filesystem adapter.");
     }
 
+    const target = await this.prepareCodexWritableTarget(targetPath);
     const prompt = [
       "# Codex Excalidraw Drawing Revision",
       "",
       "You are revising an existing Obsidian Excalidraw Markdown drawing from inside the vault root.",
-      `Target drawing: ${targetPath}`,
+      `Target drawing: ${target.codexPath}`,
+      "",
+      ...this.codexBridgePrompt(target),
       "",
       "# Current Plugin Style Settings",
       "",
@@ -705,7 +716,7 @@ export default class CodexExcalidrawPlugin extends Plugin {
       "",
       "Read the target drawing file first.",
       "If the drawing frontmatter contains `codex_sources`, read those Markdown source notes before revising.",
-      "Edit only the target drawing file. Do not create unrelated files.",
+      `Edit only the target drawing file: ${target.codexPath}. Do not create unrelated files.`,
       "Keep editable Excalidraw text, rectangles, and arrows. Do not flatten the result into an image.",
       "Fix overlapping text, tiny handwriting, raw block IDs, decorative colors, or dashboard/card clutter.",
       "Prefer a teacher-at-the-board note: reading question, conclusion, evidence spine, caveat, and next check.",
@@ -719,6 +730,8 @@ export default class CodexExcalidrawPlugin extends Plugin {
       onStderr: (chunk) => onUpdate?.(chunk, "stderr"),
     });
     const summary = summarizeCodexResult(result.stdout || result.stderr);
+    await this.validateDrawingTarget(target.codexPath);
+    await this.finalizeCodexWritableTarget(target);
     new Notice(`Codex CLI finished. ${summary || "Active drawing revised."}`, 10000);
     return summary;
   }
@@ -734,8 +747,11 @@ export default class CodexExcalidrawPlugin extends Plugin {
       throw new Error("Codex CLI Canvas refinement requires the desktop filesystem adapter.");
     }
 
+    const target = await this.prepareCodexWritableTarget(targetPath);
     const prompt = [
-      buildCanvasBrief(contexts, targetPath),
+      buildCanvasBrief(contexts, target.codexPath),
+      "",
+      ...this.codexBridgePrompt(target),
       "",
       "# User Instruction",
       "",
@@ -744,8 +760,8 @@ export default class CodexExcalidrawPlugin extends Plugin {
       "# Execution",
       "",
       "Read the source Markdown files and target canvas from disk first.",
-      `Edit only this target canvas file: ${targetPath}`,
-      "Do not create another `.canvas` file in the vault root or any fallback folder. If the target path cannot be written, report failure instead of creating an alternate file.",
+      `Edit only this target canvas file: ${target.codexPath}`,
+      "Do not create another `.canvas` file in the vault root or any fallback folder. If the final target is a symlink/CloudStorage path, ignore that path for Codex writes and edit only the listed working copy.",
       "Keep it as valid Obsidian JSON Canvas. Do not generate Excalidraw Markdown for this action.",
       "Remove or replace placeholder nodes. Every text node must contain readable Korean content anchored to the source notes.",
     ].join("\n");
@@ -755,7 +771,8 @@ export default class CodexExcalidrawPlugin extends Plugin {
       onStdout: (chunk) => onUpdate?.(chunk, "stdout"),
       onStderr: (chunk) => onUpdate?.(chunk, "stderr"),
     });
-    const stats = await this.validateCanvasTarget(targetPath);
+    const stats = await this.validateCanvasTarget(target.codexPath);
+    await this.finalizeCodexWritableTarget(target);
     const summary = summarizeCodexResult(result.stdout || result.stderr);
     const verified = `검증: 텍스트 ${stats.textNodeCount}개, 원문 ${stats.fileNodeCount}개, 연결 ${stats.edgeCount}개`;
     new Notice(`Codex CLI finished. ${summary || "Canvas refined."} ${verified}`, 10000);
@@ -772,11 +789,14 @@ export default class CodexExcalidrawPlugin extends Plugin {
       throw new Error("Codex CLI Canvas revision requires the desktop filesystem adapter.");
     }
 
+    const target = await this.prepareCodexWritableTarget(targetPath);
     const prompt = [
       "# Obsidian Canvas Revision",
       "",
       "You are revising an existing Obsidian `.canvas` JSON file from inside the vault root.",
-      `Target canvas: ${targetPath}`,
+      `Target canvas: ${target.codexPath}`,
+      "",
+      ...this.codexBridgePrompt(target),
       "",
       "# User Instruction",
       "",
@@ -786,8 +806,8 @@ export default class CodexExcalidrawPlugin extends Plugin {
       "",
       "Read the target canvas file first.",
       "Read any `file` node Markdown paths that are relevant before revising.",
-      "Edit only the target `.canvas` file.",
-      "Do not create another `.canvas` file. If the target is not writable, report failure instead of creating an alternate file.",
+      `Edit only the target canvas file: ${target.codexPath}.`,
+      "Do not create another `.canvas` file. If the final target is a symlink/CloudStorage path, ignore that path for Codex writes and edit only the listed working copy.",
       "Keep valid JSON Canvas with top-level `nodes` and `edges` arrays.",
       "Every node and edge id must be unique 16-character lowercase hex.",
       "Every edge must reference existing nodes.",
@@ -802,7 +822,8 @@ export default class CodexExcalidrawPlugin extends Plugin {
       onStdout: (chunk) => onUpdate?.(chunk, "stdout"),
       onStderr: (chunk) => onUpdate?.(chunk, "stderr"),
     });
-    const stats = await this.validateCanvasTarget(targetPath);
+    const stats = await this.validateCanvasTarget(target.codexPath);
+    await this.finalizeCodexWritableTarget(target);
     const summary = summarizeCodexResult(result.stdout || result.stderr);
     const verified = `검증: 텍스트 ${stats.textNodeCount}개, 원문 ${stats.fileNodeCount}개, 연결 ${stats.edgeCount}개`;
     new Notice(`Codex CLI finished. ${summary || "Canvas revised."} ${verified}`, 10000);
@@ -863,6 +884,74 @@ export default class CodexExcalidrawPlugin extends Plugin {
   private notifyCodexError(error: unknown): void {
     const message = error instanceof Error ? error.message : String(error);
     new Notice(`Codex CLI failed: ${message.slice(0, 220)}`, 12000);
+  }
+
+  private async prepareCodexWritableTarget(finalPath: string): Promise<CodexWritableTarget> {
+    const normalizedFinalPath = normalizePath(finalPath);
+    if (!this.isSymlinkedVaultPath(normalizedFinalPath)) {
+      return {
+        finalPath: normalizedFinalPath,
+        codexPath: normalizedFinalPath,
+        bridged: false,
+      };
+    }
+
+    const content = await this.app.vault.adapter.read(normalizedFinalPath);
+    const codexPath = await this.nextCodexBridgePath(normalizedFinalPath);
+    await this.app.vault.adapter.write(codexPath, content);
+    new Notice(
+      `symlink/CloudStorage 대상은 Codex bridge 작업본으로 처리한 뒤 원래 위치에 저장합니다: ${normalizedFinalPath}`,
+      9000,
+    );
+    return {
+      finalPath: normalizedFinalPath,
+      codexPath,
+      bridged: true,
+    };
+  }
+
+  private async finalizeCodexWritableTarget(target: CodexWritableTarget): Promise<void> {
+    if (!target.bridged) return;
+    const content = await this.app.vault.adapter.read(target.codexPath);
+    await this.app.vault.adapter.write(target.finalPath, content);
+    try {
+      await this.app.vault.adapter.remove(target.codexPath);
+    } catch {
+      // Leaving the bridge copy is harmless and can help diagnose rare copy-back failures.
+    }
+  }
+
+  private codexBridgePrompt(target: CodexWritableTarget): string[] {
+    if (!target.bridged) return [];
+    return [
+      "# Symlink / CloudStorage Write Bridge",
+      "",
+      `Final target path: ${target.finalPath}`,
+      `Codex-writable working copy: ${target.codexPath}`,
+      "The final target is under a symlink or CloudStorage-backed folder. Do not run apply_patch, shell redirection, or file writes against the final target path.",
+      "Edit only the Codex-writable working copy listed above. The Obsidian plugin will validate that working copy and copy it back to the final target after Codex exits.",
+      "Do not report failure just because the final target path itself is not writable from the Codex sandbox.",
+    ];
+  }
+
+  private async nextCodexBridgePath(finalPath: string): Promise<string> {
+    await this.ensureFolder(CODEX_BRIDGE_FOLDER);
+    const filename = finalPath.split("/").pop() || "target";
+    const extension = filename.endsWith(".canvas") ? ".canvas" : ".excalidraw.md";
+    const basename = sanitizeFileName(
+      filename
+        .replace(/\.excalidraw\.md$/i, "")
+        .replace(/\.canvas$/i, "")
+        .slice(0, 90) || "target",
+    );
+    const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "");
+    let path = normalizePath(`${CODEX_BRIDGE_FOLDER}/${basename} bridge ${stamp}${extension}`);
+    let counter = 2;
+    while (this.app.vault.getAbstractFileByPath(path)) {
+      path = normalizePath(`${CODEX_BRIDGE_FOLDER}/${basename} bridge ${stamp} ${counter}${extension}`);
+      counter += 1;
+    }
+    return path;
   }
 
   private async validateCanvasTarget(path: string): Promise<{ textNodeCount: number; fileNodeCount: number; edgeCount: number }> {
@@ -1030,6 +1119,10 @@ export default class CodexExcalidrawPlugin extends Plugin {
       counter += 1;
     }
     return path;
+  }
+
+  private getConfiguredOutputFolder(): string {
+    return normalizePath(this.settings.outputFolder || DEFAULT_SETTINGS.outputFolder);
   }
 
   private getCodexWritableOutputFolder(): string {

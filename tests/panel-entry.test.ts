@@ -255,4 +255,19 @@ describe("Codex drawing panel entry points", () => {
     expect(stylesSource).toContain("codex-excalidraw-panel-output-dismiss");
     expect(stylesSource).toContain("codex-excalidraw-panel-output-path");
   });
+
+  it("bridges Codex edits for symlinked or CloudStorage-backed output folders", () => {
+    expect(pluginSource).toContain("CODEX_BRIDGE_FOLDER");
+    expect(pluginSource).toContain("Codex Maps/_codex_bridge");
+    expect(pluginSource).toContain("CodexWritableTarget");
+    expect(pluginSource).toContain("prepareCodexWritableTarget");
+    expect(pluginSource).toContain("finalizeCodexWritableTarget");
+    expect(pluginSource).toContain("codexBridgePrompt");
+    expect(pluginSource).toContain("Symlink / CloudStorage Write Bridge");
+    expect(pluginSource).toContain("Codex-writable working copy");
+    expect(pluginSource).toContain("Do not run apply_patch");
+    expect(pluginSource).toContain("Do not report failure just because the final target path itself is not writable");
+    expect(pluginSource).toContain("this.finalizeCodexWritableTarget(target)");
+    expect(pluginSource).toContain("getConfiguredOutputFolder");
+  });
 });
